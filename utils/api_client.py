@@ -1,29 +1,23 @@
-import requests
-import os
-from dotenv import load_dotenv
-
-# Carga las variables de entorno (.env en local, Secrets en Streamlit Cloud)
-load_dotenv()
-
-class FootballDataClient:
-    def __init__(self):
-        self.api_key = os.getenv("RAPIDAPI_KEY")
-        self.host = os.getenv("RAPIDAPI_HOST")
-        self.headers = {
-            "X-RapidAPI-Key": self.api_key,
-            "X-RapidAPI-Host": self.host
-        }
-
-    def get_match_stats(self, fixture_id):
+def get_todays_fixtures(self, league_id):
         """
-        Extrae estadísticas avanzadas (xG, tiros, posesión) del partido.
+        Detecta la temporada y recupera partidos sin saturar la memoria.
         """
-        url = f"https://{self.host}/v3/fixtures/statistics"
-        params = {"fixture": fixture_id}
+        import datetime
+        now = datetime.datetime.now()
+        today = now.strftime('%Y-%m-%d')
+        
+        # Lógica de Temporada ACBE+
+        # Ligas Europeas (Finalizan en 2026 pero su ID de registro es 2025)
+        ligas_euro = [2, 3, 39, 140, 135, 78, 61]
+        season = 2025 if league_id in ligas_euro else 2026
+            
+        url = f"https://{self.host}/v3/fixtures"
+        params = {"league": league_id, "season": season, "date": today}
         
         try:
             response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
-            return response.json()['response']
+            return response.json().get('response', [])
         except Exception as e:
-            return f"Error en conexión: {e}"
+            print(f"Error consultando fixtures: {e}")
+            return []
