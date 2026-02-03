@@ -803,7 +803,7 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_con
                     # Gráfico de distribución de retornos
                     fig_dist = go.Figure()
                     fig_dist.add_trace(go.Histogram(
-                        x = rec.get('backtest_metrics', {}).get('distribución_retornos', [])
+                        x = rec.get('backtest_metrics', {}).get('distribucion_retornos', []),
                         nbinsx=50,
                         name="Distribución Retornos",
                         marker_color='#636EFA'
