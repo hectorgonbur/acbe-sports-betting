@@ -849,14 +849,14 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_con
         # En lugar de texto, muestra la diferencia numérica
         delta_roi_pct = (ev_promedio - (roi_target/100)) * 100  # Diferencia en %
         st.metric("ROI Esperado", f"{ev_promedio:.2%}", 
-         delta=f"{delta_roi_pct:+.1f}%", delta_color=color_roi)
+         delta=f"{delta_roi_pct:+.1f}", delta_color=color_roi)
 
         with col_obj2:
                 color_cvar = "green" if cvar_promedio <= cvar_target/100 else "red"
         # Mostrar la diferencia entre el CVaR y el target
                 delta_cvar_pct = (cvar_promedio - (cvar_target/100)) * 100
                 st.metric("CVaR Estimado", f"{cvar_promedio:.2%}", 
-                delta=f"{delta_cvar_pct:+.1f}%", delta_color=color_cvar)
+                delta=f"{delta_cvar_pct:+.1f}", delta_color=color_cvar)
 
         with col_obj3:
                 color_sharpe = "green" if sharpe_promedio >= sharpe_min else "orange"
