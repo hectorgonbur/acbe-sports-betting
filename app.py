@@ -845,25 +845,19 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_con
             col_obj1, col_obj2, col_obj3, col_obj4 = st.columns(4)
 
         with col_obj1:
-                color_roi = "green" if ev_promedio * 100 >= roi_target * 0.8 else "orange"
-        # En lugar de texto, muestra la diferencia numérica
-        delta_roi_pct = (ev_promedio - (roi_target/100)) * 100  # Diferencia en %
-        st.metric("ROI Esperado", f"{ev_promedio:.2%}", 
-         delta=f"{delta_roi_pct:+.1f}", delta_color=color_roi)
+            color_text = "🟢" if ev_promedio * 100 >= roi_target * 0.8 else "🟠"
+            st.metric(f"ROI Esperado {color_text}", f"{ev_promedio:.2%}")
+            st.caption(f"Target: {roi_target}%")
 
         with col_obj2:
-                color_cvar = "green" if cvar_promedio <= cvar_target/100 else "red"
-        # Mostrar la diferencia entre el CVaR y el target
-                delta_cvar_pct = (cvar_promedio - (cvar_target/100)) * 100
-                st.metric("CVaR Estimado", f"{cvar_promedio:.2%}", 
-                delta=f"{delta_cvar_pct:+.1f}", delta_color=color_cvar)
+            color_text = "🟢" if cvar_promedio <= cvar_target/100 else "🔴"
+            st.metric(f"CVaR Estimado {color_text}", f"{cvar_promedio:.2%}")
+            st.caption(f"Máx: {cvar_target}%")
 
         with col_obj3:
-                color_sharpe = "green" if sharpe_promedio >= sharpe_min else "orange"
-        # Mostrar la diferencia en Sharpe
-                delta_sharpe = sharpe_promedio - sharpe_min
-                st.metric("Sharpe Esperado", f"{sharpe_promedio:.2f}",
-                delta=f"{delta_sharpe:+.2f}", delta_color=color_sharpe)
+            color_text = "🟢" if sharpe_promedio >= sharpe_min else "🟠"
+            st.metric(f"Sharpe Esperado {color_text}", f"{sharpe_promedio:.2f}")
+            st.caption(f"Mín: {sharpe_min}")
 
         with col_obj4:
                 st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
