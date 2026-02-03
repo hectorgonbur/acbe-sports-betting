@@ -7,25 +7,33 @@ st.set_page_config(page_title="ACBE Quantum Terminal", layout="wide")
 st.title("🏛️ Sistema de Inteligencia Predictiva ACBE-Kelly (Versión Cuántica)")
 st.markdown("---")
 
-# --- FASE 1: INGENIERÍA DE DATOS (INPUT MANUAL DE ALTA FIDELIDAD) ---
+# --- BARRA LATERAL: INGENIERÍA DE DATOS Y GUÍA DE AJUSTE ---
 st.sidebar.header("📥 Fase 1: Data Mining")
 team_h = st.sidebar.text_input("Local", value="Bologna")
 team_a = st.sidebar.text_input("Visitante", value="AC Milan")
+
+# --- NUEVA GUÍA TÉCNICA DE BAJAS ---
+with st.sidebar.expander("📖 Guía de Impacto Estructural (δ)"):
+    st.markdown("""
+    | Importancia | Valor de δ | Ejemplo |
+    | :--- | :--- | :--- |
+    | **Crítica** | **0.07 - 0.10** | Goleador estrella, Capitán. |
+    | **Alta** | **0.05 - 0.06** | Portero, Defensa líder. |
+    | **Media** | **0.03 - 0.04** | Creativo, Lateral titular. |
+    | **Baja** | **0.01 - 0.02** | Recambio habitual. |
+    """)
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
     st.markdown(f"**{team_h}**")
     g_h = st.number_input("Goles (10p)", value=1.5, step=0.1)
     xg_h = st.number_input("xG (10p)", value=1.65, step=0.05)
-    tiros_h = st.number_input("Tiros al arco", value=5.0, step=0.1)
-    # δ_posicion para ajuste estructural
     delta_h = st.sidebar.slider(f"Σ δ Bajas {team_h}", 0.0, 0.25, 0.0, step=0.01)
 
 with col2:
     st.markdown(f"**{team_a}**")
     g_a = st.number_input("Goles (10p)", value=1.2, step=0.1)
     xg_a = st.number_input("xG (10p)", value=1.40, step=0.05)
-    tiros_a = st.number_input("Tiros al arco", value=4.5, step=0.1)
     delta_a = st.sidebar.slider(f"Σ δ Bajas {team_a}", 0.0, 0.25, 0.0, step=0.01)
 
 st.sidebar.markdown("---")
@@ -74,15 +82,9 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS") and not evasion:
         
         res_df = []
         for label, prob, cuota in zip(["1", "X", "2"], p_final.values(), [c1, cx, c2]):
-            # FASE 3: Análisis de Valor
             value = (prob * cuota) - 1
-            
-            # Cálculo de Stake Kelly Fraccional (Half-Kelly obligatorio)
             b = cuota - 1
-            q = 1 - prob
-            f_star = (b * prob - q) / b if b > 0 else 0
-            
-            # Condición Crítica: Value >= 3% y f* > 0
+            f_star = (b * prob - (1 - prob)) / b if b > 0 else 0
             stake_final = max(0, f_star * k_adj * 0.5) if value >= 0.03 else 0
             
             res_df.append({
@@ -98,7 +100,6 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS") and not evasion:
         st.subheader(f"📊 Matriz Final: {team_h} vs {team_a}")
         st.table(pd.DataFrame(res_df))
         
-        # Validación de Retorno Esperado
         if any(float(r["Value %"].strip('%'))/100 >= 0.03 for r in res_df):
             st.success("✅ Oportunidad detectada con Esperanza Matemática Positiva (EV+).")
         else:
