@@ -1,7 +1,0 @@
-Copyright (c) 2026 Héctor González
-
-All rights reserved.
-
-This source code is proprietary and confidential.
-No part of this repository may be copied, modified, distributed,
-or used without explicit written permission from the author.
