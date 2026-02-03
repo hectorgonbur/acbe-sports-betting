@@ -1,44 +1,38 @@
-import pandas as pd
 import numpy as np
 
-def calculate_dynamic_lambdas(match_data_df, team_name, window=10):
+def calculate_dynamic_lambdas(api_response, team_name):
     """
-    Fase 1.1: Extrae métricas ofensivas/defensivas y calcula λ.
-    Ajusta por xG y goles reales de los últimos 'window' partidos.
+    Fase 1.1: Extrae goles y xG para calcular el λ (Lambda) real.
     """
-    # Filtrar últimos n partidos del equipo
-    recent_matches = match_data_df[
-        (match_data_df['home_team'] == team_name) | 
-        (match_data_df['away_team'] == team_name)
-    ].tail(window)
-    
-    # Calcular promedio de goles anotados y recibidos
     goles_anotados = []
-    for _, row in recent_matches.iterrows():
-        if row['home_team'] == team_name:
-            goles_anotados.append(row['home_score'])
-        else:
-            goles_anotados.append(row['away_score'])
-            
-    # λ base = Promedio simple de goles
-    lambda_base = np.mean(goles_anotados)
-    
-    # Ajuste estructural por xG (si la API lo provee)
-    # Ratio xG/G: Si xG > Goles, el equipo está 'debido' (sube λ)
-    if 'xg' in recent_matches.columns:
-        xg_avg = recent_matches['xg'].mean()
-        factor_ajuste = xg_avg / (lambda_base if lambda_base > 0 else 1)
-        lambda_final = lambda_base * factor_ajuste
-    else:
-        lambda_final = lambda_base
-        
-    return lambda_final
+    xg_data = []
 
-def get_strength_index_adjustment(base_si, injuries_list):
+    for match in api_response:
+        # Lógica para identificar si el equipo fue local o visitante
+        stats = match.get('statistics', [])
+        for s in stats:
+            if s['team']['name'] == team_name:
+                # Extraemos goles reales
+                goals = match['goals']['home' if match['teams']['home']['name'] == team_name else 'away']
+                goles_anotados.append(goals)
+                
+                # Extraemos xG (si está disponible en la API)
+                for stat in s['statistics']:
+                    if stat['type'] == 'expected_goals':
+                        xg_data.append(float(stat['value']) if stat['value'] else goals)
+
+    # Cálculo Bayesiano: λ ajustado por xG
+    lambda_base = np.mean(goles_anotados) if goles_anotados else 1.0
+    lambda_xg = np.mean(xg_data) if xg_data else lambda_base
+    
+    # λ Final = Promedio ponderado entre realidad y expectativa
+    return (lambda_base * 0.4) + (lambda_xg * 0.6)
+
+def get_structural_adjustment(base_si, injuries_list):
     """
-    Fase 1.3: Ajuste al Strength Index según vector de lesiones.
+    Fase 1.3: Ajuste Estructural al Strength Index (SI).
     """
-    # Vector de impacto por posición (según prompt v2.0)
+    # Vector de impacto basado en el prompt v2.0
     impact_map = {
         'arquero_titular': 0.05,
         'defensa_clave': 0.04,
