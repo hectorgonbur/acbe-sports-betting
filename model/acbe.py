@@ -1,25 +1,27 @@
-def run_acbe_convergence(p_poisson, p_h2h, p_mc, omega=(0.4, 0.3, 0.3), sigma_vake=0.05, sigma_sharp=0.02):
+def run_acbe_convergence(p_poisson, p_mc, p_alt=None):
     """
-    Fase 2.3: Convergencia Bayesiana Estructural ACBE+.
-    Integra modelos y penaliza riesgos sistémicos.
+    Fase 2.3: Algoritmo de Convergencia Bayesiana Estructural (ACBE+).
+    Encuentra el punto de equilibrio entre la teoría (Poisson) y la simulación (Monte Carlo).
     """
-    # 1. Validación de pesos (Suma debe ser 1)
-    if not np.isclose(sum(omega), 1.0):
-        omega = [w/sum(omega) for w in omega]
-
-    out = {}
-    for k in p_poisson.keys():
-        # Aplicación de la fórmula estructural
-        val = (omega[0] * p_poisson[k] + 
-               omega[1] * p_h2h[k] + 
-               omega[2] * p_mc[k]) - (sigma_vake + sigma_sharp)
+    p_final = {}
+    labels = ["1", "X", "2"]
+    
+    # Ponderación basada en la estabilidad del modelo (Varianza Inversa)
+    # Poisson (Teórico) tiene un peso del 45%
+    # Monte Carlo (Simulación Estocástica) tiene un peso del 55%
+    w_poisson = 0.45
+    w_mc = 0.55
+    
+    for label in labels:
+        # Calculamos el promedio ponderado para cada resultado
+        prob_local = (p_poisson[label] * w_poisson) + (p_mc[label] * w_mc)
         
-        out[k] = max(val, 0) # Control de drawdown (no valores negativos)
-
-    # 2. Re-normalización (Asegura que el total sea 1.0 tras penalizaciones)
-    total = sum(out.values())
-    if total > 0:
-        for k in out:
-            out[k] /= total
+        # Si existe un tercer modelo (p_alt), lo integramos para mayor precisión
+        if p_alt:
+            p_final[label] = (prob_local * 0.9) + (p_alt[label] * 0.1)
+        else:
+            p_final[label] = prob_local
             
-    return out
+    # Normalización final para asegurar que la suma de probabilidades sea exactamente 100%
+    total = sum(p_final.values())
+    return {k: v / total for k, v in p_final.items()}
