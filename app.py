@@ -7,13 +7,14 @@ st.set_page_config(page_title="ACBE Quantum Terminal", layout="wide")
 st.title("🏛️ Sistema de Inteligencia Predictiva ACBE-Kelly (Versión Cuántica)")
 st.markdown("---")
 
-# --- BARRA LATERAL: INGENIERÍA DE DATOS Y GUÍA DE AJUSTE ---
+# --- BARRA LATERAL: INGENIERÍA DE DATOS Y GUÍAS DE CALIBRACIÓN ---
 st.sidebar.header("📥 Fase 1: Data Mining")
 team_h = st.sidebar.text_input("Local", value="Bologna")
 team_a = st.sidebar.text_input("Visitante", value="AC Milan")
 
-# --- GUÍA TÉCNICA DE BAJAS ---
-with st.sidebar.expander("📖 Guía de Impacto Estructural (δ)"):
+# --- BLOQUE DE GUÍAS TÉCNICAS (AMPLIADO) ---
+with st.sidebar.expander("📖 GUÍAS DE CALIBRACIÓN QUÁNTICA", expanded=True):
+    st.markdown("### 1. Impacto Estructural (δ)")
     st.markdown("""
     | Importancia | Valor de δ | Ejemplo |
     | :--- | :--- | :--- |
@@ -22,6 +23,24 @@ with st.sidebar.expander("📖 Guía de Impacto Estructural (δ)"):
     | **Media** | **0.03 - 0.04** | Creativo, Lateral titular. |
     | **Baja** | **0.01 - 0.02** | Recambio habitual. |
     """)
+    
+    st.markdown("### 2. Entropía de Liga (H)")
+    st.markdown("""
+    | Nivel de Ruido | Valor H | Contexto |
+    | :--- | :--- | :--- |
+    | **Bajo** | **0.30 - 0.45** | Ligas estables (Premier/Bundes). |
+    | **Medio** | **0.50 - 0.65** | Ligas competitivas (Serie A). |
+    | **Alto** | **0.70 - 0.90** | Ligas volátiles o Copas. |
+    """)
+    
+    st.markdown("### 3. Sharp Move (σ)")
+    st.markdown("""
+    | Movimiento | Valor σ | Acción |
+    | :--- | :--- | :--- |
+    | **Nulo** | **0.00** | Sin cambios en cuotas. |
+    | **Leve** | **0.01 - 0.02** | Ajuste normal del mercado. |
+    | **Fuerte** | **0.03 - 0.05** | ¡Dinero Inteligente entrando! |
+    """)
 
 # --- FASE 1: INGENIERÍA DE DATOS AMPLIADA ---
 col1, col2 = st.sidebar.columns(2)
@@ -29,14 +48,14 @@ with col1:
     st.markdown(f"**{team_h}**")
     g_h = st.number_input("Goles (10p)", value=1.5, step=0.1)
     xg_h = st.number_input("xG (10p)", value=1.65, step=0.05)
-    tiros_h = st.number_input("Remates Arco (Prom)", value=5.0, step=0.1) # Agregado
+    tiros_h = st.number_input("Remates Arco (Prom)", value=5.0, step=0.1)
     delta_h = st.sidebar.slider(f"Σ δ Bajas {team_h}", 0.0, 0.25, 0.0, step=0.01)
 
 with col2:
     st.markdown(f"**{team_a}**")
     g_a = st.number_input("Goles (10p)", value=1.2, step=0.1)
     xg_a = st.number_input("xG (10p)", value=1.40, step=0.05)
-    tiros_a = st.number_input("Remates Arco (Prom)", value=4.5, step=0.1) # Agregado
+    tiros_a = st.number_input("Remates Arco (Prom)", value=4.5, step=0.1)
     delta_a = st.sidebar.slider(f"Σ δ Bajas {team_a}", 0.0, 0.25, 0.0, step=0.01)
 
 st.sidebar.markdown("---")
@@ -62,7 +81,6 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS") and not evasion:
     with st.spinner("Ejecutando Convergencia Bayesiana..."):
         
         # 2.1 Cálculo de λ (Poisson Ajustado con validación de tiros)
-        # Incorporamos Remates al Arco como validador de volumen ofensivo
         f_forma_h = (xg_h / g_h if g_h > 0 else 1.0) * (tiros_h / 5.0)
         f_forma_a = (xg_a / g_a if g_a > 0 else 1.0) * (tiros_a / 5.0)
         
