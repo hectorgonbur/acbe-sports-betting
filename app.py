@@ -846,19 +846,29 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_con
             
             with col_obj1:
                 color_roi = "green" if ev_promedio * 100 >= roi_target * 0.8 else "orange"
+               with col_obj1:
+                    color_roi = "green" if ev_promedio * 100 >= roi_target * 0.8 else "orange"
+            # En lugar de texto, muestra la diferencia numérica
+                delta_roi_pct = (ev_promedio - (roi_target/100)) * 100  # Diferencia en %
                 st.metric("ROI Esperado", f"{ev_promedio:.2%}", 
-                         delta=f"Target: {roi_target}%", delta_color=color_roi)
-            
-            with col_obj2:
-                color_cvar = "green" if cvar_promedio <= cvar_target/100 else "red"
+                delta=f"{delta_roi_pct:+.1f}%", delta_color=color_roi)
+
+                with col_obj2:
+                    color_cvar = "green" if cvar_promedio <= cvar_target/100 else "red"
+            # Mostrar la diferencia entre el CVaR y el target
+                delta_cvar_pct = (cvar_promedio - (cvar_target/100)) * 100
                 st.metric("CVaR Estimado", f"{cvar_promedio:.2%}", 
-                         delta=f"Máx: {cvar_target}%", delta_color=color_cvar)
-            
-            with col_obj3:
-                color_sharpe = "green" if sharpe_promedio >= sharpe_min else "orange"
+                delta=f"{delta_cvar_pct:+.1f}%", delta_color=color_cvar)
+
+                with col_obj3:
+                    color_sharpe = "green" if sharpe_promedio >= sharpe_min else "orange"
+            # Mostrar la diferencia en Sharpe
+                delta_sharpe = sharpe_promedio - sharpe_min
                 st.metric("Sharpe Esperado", f"{sharpe_promedio:.2f}",
-                         delta=f"Mín: {sharpe_min}", delta_color=color_sharpe)
-            
+             delta=f"{delta_sharpe:+.2f}", delta_color=color_sharpe)
+
+            with col_obj4:
+                st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
             with col_obj4:
                 st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
             
