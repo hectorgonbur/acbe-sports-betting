@@ -870,8 +870,8 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_con
         with col_obj4:
                 st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
             
-            # Resumen de objetivos
-            if len(objetivos_cumplidos) >= 2:
+        # Resumen de objetivos
+        if len(objetivos_cumplidos) >= 2:
                 st.success(f"✅ **SISTEMA DENTRO DE PARÁMETROS:** {', '.join(objetivos_cumplidos)}")
             else:
                 st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
