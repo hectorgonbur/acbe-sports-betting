@@ -12,7 +12,7 @@ st.sidebar.header("📥 Fase 1: Data Mining")
 team_h = st.sidebar.text_input("Local", value="Bologna")
 team_a = st.sidebar.text_input("Visitante", value="AC Milan")
 
-# --- NUEVA GUÍA TÉCNICA DE BAJAS ---
+# --- GUÍA TÉCNICA DE BAJAS ---
 with st.sidebar.expander("📖 Guía de Impacto Estructural (δ)"):
     st.markdown("""
     | Importancia | Valor de δ | Ejemplo |
@@ -23,17 +23,20 @@ with st.sidebar.expander("📖 Guía de Impacto Estructural (δ)"):
     | **Baja** | **0.01 - 0.02** | Recambio habitual. |
     """)
 
+# --- FASE 1: INGENIERÍA DE DATOS AMPLIADA ---
 col1, col2 = st.sidebar.columns(2)
 with col1:
     st.markdown(f"**{team_h}**")
     g_h = st.number_input("Goles (10p)", value=1.5, step=0.1)
     xg_h = st.number_input("xG (10p)", value=1.65, step=0.05)
+    tiros_h = st.number_input("Remates Arco (Prom)", value=5.0, step=0.1) # Agregado
     delta_h = st.sidebar.slider(f"Σ δ Bajas {team_h}", 0.0, 0.25, 0.0, step=0.01)
 
 with col2:
     st.markdown(f"**{team_a}**")
     g_a = st.number_input("Goles (10p)", value=1.2, step=0.1)
     xg_a = st.number_input("xG (10p)", value=1.40, step=0.05)
+    tiros_a = st.number_input("Remates Arco (Prom)", value=4.5, step=0.1) # Agregado
     delta_a = st.sidebar.slider(f"Σ δ Bajas {team_a}", 0.0, 0.25, 0.0, step=0.01)
 
 st.sidebar.markdown("---")
@@ -46,7 +49,7 @@ c2 = st.sidebar.number_input("Cuota 2", value=2.45, min_value=1.01)
 entropy = st.sidebar.slider("Entropía de Liga (H)", 0.30, 0.90, 0.62)
 steam_move = st.sidebar.slider("Steam / Sharp Move (σ)", 0.0, 0.05, 0.0, step=0.01)
 
-# --- FASE 0: FILTRO DE MERCADO (PRE-ANÁLISIS DE SEGURIDAD) ---
+# --- FASE 0: FILTRO DE MERCADO ---
 or_val = (1/c1 + 1/cx + 1/c2) - 1
 evasion = False
 
@@ -58,11 +61,11 @@ elif entropy > 0.72: evasion = f"Entropía excesiva (H={entropy:.2f})"
 if st.sidebar.button("🚀 EJECUTAR ANÁLISIS") and not evasion:
     with st.spinner("Ejecutando Convergencia Bayesiana..."):
         
-        # 2.1 Cálculo de λ (Poisson Ajustado)
-        f_forma_h = xg_h / g_h if g_h > 0 else 1.0
-        f_forma_a = xg_a / g_a if g_a > 0 else 1.0
+        # 2.1 Cálculo de λ (Poisson Ajustado con validación de tiros)
+        # Incorporamos Remates al Arco como validador de volumen ofensivo
+        f_forma_h = (xg_h / g_h if g_h > 0 else 1.0) * (tiros_h / 5.0)
+        f_forma_a = (xg_a / g_a if g_a > 0 else 1.0) * (tiros_a / 5.0)
         
-        # Ajuste estructural SI_adj = SI_base * (1 - Σ δ)
         l_h = g_h * f_forma_h * 1.10 * (1 - delta_h) 
         l_a = g_a * f_forma_a * 0.90 * (1 - delta_a)
 
@@ -74,7 +77,7 @@ if st.sidebar.button("🚀 EJECUTAR ANÁLISIS") and not evasion:
         px_mc = np.mean(mc_h == mc_a)
         p2_mc = np.mean(mc_h < mc_a)
         
-        # 2.3 Convergencia Bayesiana (Simplificada para manual)
+        # 2.3 Convergencia Bayesiana
         p_final = {"1": p1_mc - steam_move, "X": px_mc, "2": p2_mc - steam_move}
 
         # --- FASE 4: GESTIÓN DE CAPITAL (KELLY BAYESIANO FRACCIONAL) ---
