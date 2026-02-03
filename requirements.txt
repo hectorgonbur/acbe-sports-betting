@@ -4,3 +4,5 @@ pandas
 scipy
 requests
 python-dotenv
+pip install
+plotly
