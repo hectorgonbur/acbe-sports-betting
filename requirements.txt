@@ -1,4 +1,6 @@
 streamlit
 numpy
-scipy
 pandas
+scipy
+requests
+python-dotenv
