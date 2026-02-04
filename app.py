@@ -362,6 +362,9 @@ elif menu == "🏠 App Principal":
     from reportlab.pdfgen import canvas
     from reportlab.lib.utils import ImageReader
     from scipy import stats
+    from scipy.optimize import minimize
+    import plotly.graph_objects as go
+    from datetime import datetime, timedelta
     
     # ============ CONFIGURACIÓN AVANZADA ============
     st.title("🏛️ Sistema ACBE-Kelly v3.0 (Bayesiano Completo)")
