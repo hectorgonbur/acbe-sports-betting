@@ -1094,7 +1094,6 @@ elif menu == "🏠 App Principal":
     OBJETIVO: ROI 12-18% con CVaR < 15%
     """
 
-    import streamlit as st
     import pandas as pd
     import numpy as np
     from scipy import stats
