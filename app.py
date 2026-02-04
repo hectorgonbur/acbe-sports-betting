@@ -1,6 +1,8 @@
 # En tu app.py principal, añade al inicio:
 import streamlit as st
 
+st.set_page_config(page_title="Sistema ACBE-Kelly", layout="wide")
+
 # Sidebar navigation
 menu = st.sidebar.selectbox(
     "Navegación",
@@ -10,7 +12,6 @@ menu = st.sidebar.selectbox(
 if menu == "🎓 Guía Interactiva":
     # Copia aquí TODO el código de la guía
     # Configuración de la guía
-    st.set_page_config(...)
     st.title(...)
     
     # Sidebar de la guía
@@ -26,7 +27,6 @@ if menu == "🎓 Guía Interactiva":
     from scipy import stats
 
     # ============ CONFIGURACIÓN ============
-    st.set_page_config(page_title="Guía ACBE-Kelly", layout="wide")
     st.title("🎓 Guía Interactiva: Sistema ACBE-Kelly v3.0")
     st.markdown("---")
 
@@ -1102,7 +1102,6 @@ elif menu == "🏠 App Principal":
     from datetime import datetime, timedelta
 
     # ============ CONFIGURACIÓN AVANZADA ============
-    st.set_page_config(page_title="ACBE Quantum Terminal v3.0", layout="wide")
     st.title("🏛️ Sistema ACBE-Kelly v3.0 (Bayesiano Completo)")
     st.markdown("---")
 
