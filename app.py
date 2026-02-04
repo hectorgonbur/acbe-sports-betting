@@ -353,11 +353,15 @@ elif menu == "🏠 App Principal":
 
     import pandas as pd
     import numpy as np
-    from scipy import stats
-    from scipy.optimize import minimize
-    import plotly.graph_objects as go
-    from datetime import datetime, timedelta
-
+    from datetime import datetime
+    import json
+    import base64
+    from io import BytesIO
+    import matplotlib.pyplot as plt
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+    
     # ============ CONFIGURACIÓN AVANZADA ============
     st.title("🏛️ Sistema ACBE-Kelly v3.0 (Bayesiano Completo)")
     st.markdown("---")
@@ -707,7 +711,386 @@ elif menu == "🏠 App Principal":
                 },
                 "distribucion_retornos": df_metricas["return"].values
             }
+        # ============ CLASE PARA RECOMENDACIONES INTELIGENTES ============
 
+        class RecomendadorInteligente:
+            """
+            Sistema de recomendación con niveles de confianza y explicaciones
+            """
+            
+            def __init__(self):
+                self.umbrales = {
+                    'value_alto': 0.05,
+                    'value_medio': 0.03,
+                    'value_bajo': 0.02,
+                    'confianza_alta': 0.95,
+                    'confianza_media': 0.90,
+                    'confianza_baja': 0.85
+                }
+            
+            def generar_recomendacion(self, analisis):
+                """
+                Genera recomendación estructurada con explicaciones
+                """
+                # Encontrar el mejor pick
+                mejor_pick = self._encontrar_mejor_pick(analisis['resultados'])
+                
+                if not mejor_pick:
+                    return self._recomendacion_no_apostar()
+                
+                # Calcular nivel de confianza
+                confianza = self._calcular_confianza(mejor_pick, analisis)
+                
+                # Generar recomendación
+                return {
+                    'accion': self._determinar_accion(mejor_pick, confianza),
+                    'pick': mejor_pick['Resultado'],
+                    'cuota': mejor_pick['Cuota Mercado'],
+                    'ev': mejor_pick['EV'],
+                    'stake_pct': mejor_pick.get('Stake %', '0%'),
+                    'confianza': confianza,
+                    'razones': self._generar_razones(mejor_pick, analisis),
+                    'advertencias': self._generar_advertencias(mejor_pick, analisis),
+                    'timestamp': datetime.now(),
+                    'metadata': {
+                        'equipo_local': analisis.get('team_h', ''),
+                        'equipo_visitante': analisis.get('team_a', ''),
+                        'liga': analisis.get('liga', ''),
+                        'overround': analisis.get('or_val', 0),
+                        'entropia': analisis.get('entropia', 0)
+                    }
+                }
+            
+            def _encontrar_mejor_pick(self, resultados):
+                """Encuentra el pick con mayor EV positivo"""
+                picks_con_ev = []
+                for r in resultados:
+                    try:
+                        ev = float(r['EV'].strip('%')) / 100 if '%' in str(r['EV']) else float(r['EV'])
+                        if ev > 0.02:  # Solo picks con EV > 2%
+                            picks_con_ev.append({
+                                'Resultado': r['Resultado'],
+                                'EV': ev,
+                                'Cuota Mercado': float(r['Cuota Mercado']),
+                                'Prob Modelo': float(r['Prob Modelo'].strip('%')) / 100 if '%' in str(r['Prob Modelo']) else float(r['Prob Modelo']),
+                                'Value Score': float(r.get('Value Score', 0)),
+                                'Significativo': '✅' in str(r.get('Significativo', ''))
+                            })
+                    except:
+                        continue
+                
+                if not picks_con_ev:
+                    return None
+                
+                # Ordenar por EV descendente
+                return sorted(picks_con_ev, key=lambda x: x['EV'], reverse=True)[0]
+            
+            def _calcular_confianza(self, pick, analisis):
+                """Calcula nivel de confianza 0-100%"""
+                confianza = 50  # Base
+                
+                # Ajustes por EV
+                if pick['EV'] > self.umbrales['value_alto']:
+                    confianza += 25
+                elif pick['EV'] > self.umbrales['value_medio']:
+                    confianza += 15
+                elif pick['EV'] > self.umbrales['value_bajo']:
+                    confianza += 5
+                
+                # Ajuste por significancia estadística
+                if pick.get('Significativo', False):
+                    confianza += 20
+                
+                # Ajuste por sobre-round
+                or_val = analisis.get('or_val', 0.07)
+                if or_val < 0.05:
+                    confianza += 10
+                
+                # Ajuste por entropía
+                entropia = analisis.get('entropia', 0.7)
+                if entropia < 0.6:
+                    confianza += 10
+                
+                return min(max(confianza, 0), 100)
+            
+            def _determinar_accion(self, pick, confianza):
+                """Determina la acción recomendada"""
+                if confianza < 60:
+                    return "NO APOSTAR"
+                elif confianza < 75:
+                    return "APOSTAR PEQUEÑO"
+                elif confianza < 90:
+                    return "APOSTAR MODERADO"
+                else:
+                    return "APOSTAR FUERTE"
+            
+            def _generar_razones(self, pick, analisis):
+                """Genera razones para la recomendación"""
+                razones = []
+                
+                # Razón 1: Value positivo
+                razones.append(f"Value positivo: {pick['EV']:.2%}")
+                
+                # Razón 2: Significancia estadística
+                if pick.get('Significativo', False):
+                    razones.append("Significancia estadística confirmada")
+                
+                # Razón 3: Cuota atractiva
+                cuota_justa = 1 / pick['Prob Modelo']
+                if pick['Cuota Mercado'] > cuota_justa * 1.1:
+                    razones.append(f"Cuota {pick['Cuota Mercado']:.2f} vs Justa {cuota_justa:.2f}")
+                
+                return razones
+            
+            def _generar_advertencias(self, pick, analisis):
+                """Genera advertencias de riesgo"""
+                advertencias = []
+                
+                # Advertencia 1: Entropía alta
+                if analisis.get('entropia', 0) > 0.7:
+                    advertencias.append(f"Entropía alta ({analisis['entropia']:.2f}) - Mercado volátil")
+                
+                # Advertencia 2: Overround alto
+                if analisis.get('or_val', 0) > 0.06:
+                    advertencias.append(f"Margen casa alto ({analisis['or_val']:.2%})")
+                
+                # Advertencia 3: Probabilidad baja
+                if pick['Prob Modelo'] < 0.35:
+                    advertencias.append(f"Probabilidad baja ({pick['Prob Modelo']:.1%})")
+                
+                return advertencias
+            
+            def _recomendacion_no_apostar(self):
+                """Genera recomendación cuando no hay picks"""
+                return {
+                    'accion': "NO APOSTAR",
+                    'pick': None,
+                    'cuota': None,
+                    'ev': 0,
+                    'stake_pct': '0%',
+                    'confianza': 0,
+                    'razones': ["No se detectó value suficiente (> 2%)"],
+                    'advertencias': [],
+                    'timestamp': datetime.now(),
+                    'metadata': {}
+                }
+
+        # ============ SISTEMA DE EXPORTACIÓN ============
+
+        class ExportadorAnalisis:
+            """
+            Exporta análisis a múltiples formatos
+            """
+            
+            @staticmethod
+            def exportar_csv(resultados, metadata):
+                """Exporta a CSV"""
+                df = pd.DataFrame(resultados)
+                
+                # Añadir metadata como columnas
+                for key, value in metadata.items():
+                    if key not in df.columns:
+                        df[key] = value
+                
+                return df.to_csv(index=False)
+            
+            @staticmethod
+            def exportar_json(resultados, metadata):
+                """Exporta a JSON"""
+                export_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'metadata': metadata,
+                    'resultados': resultados,
+                    'version': 'ACBE-Kelly v3.0'
+                }
+                return json.dumps(export_data, indent=2, ensure_ascii=False)
+            
+            @staticmethod
+            def exportar_pdf(recomendacion, resultados, analisis_completo):
+                """Exporta a PDF (simplificado - se puede expandir)"""
+                buffer = BytesIO()
+                c = canvas.Canvas(buffer, pagesize=letter)
+                
+                # Configuración
+                width, height = letter
+                y_position = height - 50
+                
+                # Título
+                c.setFont("Helvetica-Bold", 16)
+                c.drawString(50, y_position, "📊 ACBE-Kelly: Reporte de Análisis")
+                y_position -= 30
+                
+                # Fecha
+                c.setFont("Helvetica", 10)
+                c.drawString(50, y_position, f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                y_position -= 40
+                
+                # Recomendación principal
+                c.setFont("Helvetica-Bold", 14)
+                c.drawString(50, y_position, "🎯 RECOMENDACIÓN PRINCIPAL:")
+                y_position -= 20
+                
+                c.setFont("Helvetica", 12)
+                if recomendacion['pick']:
+                    texto = f"{recomendacion['accion']} en {recomendacion['pick']} @ {recomendacion['cuota']:.2f}"
+                    c.drawString(50, y_position, texto)
+                    y_position -= 15
+                    c.drawString(50, y_position, f"Confianza: {recomendacion['confianza']:.0f}% | EV: {recomendacion['ev']:.2%}")
+                    y_position -= 20
+                else:
+                    c.drawString(50, y_position, "NO APOSTAR - Sin oportunidades detectadas")
+                    y_position -= 20
+                
+                # Tabla de resultados
+                y_position -= 20
+                c.setFont("Helvetica-Bold", 12)
+                c.drawString(50, y_position, "📈 Resultados Detallados:")
+                y_position -= 20
+                
+                # Encabezados de tabla
+                headers = ["Resultado", "Prob", "Cuota", "EV", "Value"]
+                col_widths = [80, 60, 60, 60, 60]
+                
+                c.setFont("Helvetica-Bold", 10)
+                x_pos = 50
+                for i, header in enumerate(headers):
+                    c.drawString(x_pos, y_position, header)
+                    x_pos += col_widths[i]
+                
+                y_position -= 20
+                
+                # Filas de datos
+                c.setFont("Helvetica", 10)
+                for resultado in resultados:
+                    x_pos = 50
+                    row_data = [
+                        resultado['Resultado'],
+                        resultado['Prob Modelo'],
+                        resultado['Cuota Mercado'],
+                        resultado['EV'],
+                        resultado.get('Value Score', 'N/A')
+                    ]
+                    
+                    for i, data in enumerate(row_data):
+                        c.drawString(x_pos, y_position, str(data))
+                        x_pos += col_widths[i]
+                    
+                    y_position -= 15
+                    
+                    if y_position < 100:
+                        c.showPage()
+                        y_position = height - 50
+                        c.setFont("Helvetica", 10)
+                
+                y_position -= 20
+                
+                # Razones y advertencias
+                if recomendacion.get('razones'):
+                    c.setFont("Helvetica-Bold", 12)
+                    c.drawString(50, y_position, "✅ Razones:")
+                    y_position -= 15
+                    
+                    c.setFont("Helvetica", 10)
+                    for razon in recomendacion['razones']:
+                        c.drawString(50, y_position, f"• {razon}")
+                        y_position -= 15
+                
+                if recomendacion.get('advertencias'):
+                    c.setFont("Helvetica-Bold", 12)
+                    c.drawString(50, y_position, "⚠️ Advertencias:")
+                    y_position -= 15
+                    
+                    c.setFont("Helvetica", 10)
+                    for advertencia in recomendacion['advertencias']:
+                        c.drawString(50, y_position, f"• {advertencia}")
+                        y_position -= 15
+                
+                # Guardar PDF
+                c.save()
+                buffer.seek(0)
+                return buffer
+            
+            @staticmethod
+            def exportar_resumen_html(recomendacion, resultados):
+                """Exporta resumen HTML para visualización"""
+                html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>ACBE-Kelly Report</title>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                        .header {{ background: #2c3e50; color: white; padding: 20px; border-radius: 10px; }}
+                        .recomendacion {{ background: {'#2ecc71' if recomendacion['pick'] else '#e74c3c'}; 
+                                        color: white; padding: 20px; border-radius: 10px; margin: 20px 0; }}
+                        .table {{ width: 100%; border-collapse: collapse; }}
+                        .table th {{ background: #34495e; color: white; padding: 10px; }}
+                        .table td {{ padding: 10px; border-bottom: 1px solid #ddd; }}
+                        .green {{ color: #27ae60; }}
+                        .red {{ color: #e74c3c; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🏛️ ACBE-Kelly Analysis Report</h1>
+                        <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                    </div>
+                    
+                    <div class="recomendacion">
+                        <h2>🎯 {'RECOMENDACIÓN: ' + recomendacion['accion'] if recomendacion['pick'] else 'NO RECOMENDACIÓN'}</h2>
+                """
+                
+                if recomendacion['pick']:
+                    html += f"""
+                        <p><strong>Pick:</strong> {recomendacion['pick']} @ {recomendacion['cuota']:.2f}</p>
+                        <p><strong>Confianza:</strong> {recomendacion['confianza']:.0f}%</p>
+                        <p><strong>Expected Value:</strong> <span class="green">{recomendacion['ev']:.2%}</span></p>
+                        <p><strong>Stake Recomendado:</strong> {recomendacion['stake_pct']}</p>
+                    """
+                
+                html += """
+                    </div>
+                    
+                    <h3>📊 Resultados Detallados</h3>
+                    <table class="table">
+                        <tr>
+                            <th>Resultado</th>
+                            <th>Probabilidad</th>
+                            <th>Cuota</th>
+                            <th>EV</th>
+                            <th>Value Score</th>
+                        </tr>
+                """
+                
+                for r in resultados:
+                    ev_class = "green" if float(r['EV'].strip('%'))/100 > 0 else "red"
+                    html += f"""
+                        <tr>
+                            <td>{r['Resultado']}</td>
+                            <td>{r['Prob Modelo']}</td>
+                            <td>{r['Cuota Mercado']}</td>
+                            <td class="{ev_class}">{r['EV']}</td>
+                            <td>{r.get('Value Score', 'N/A')}</td>
+                        </tr>
+                    """
+                
+                html += """
+                    </table>
+                    
+                    <h3>📝 Metadatos</h3>
+                    <ul>
+                """
+                
+                for key, value in recomendacion.get('metadata', {}).items():
+                    html += f"<li><strong>{key}:</strong> {value}</li>"
+                
+                html += """
+                    </ul>
+                </body>
+                </html>
+                """
+                
+                return html
     # ============ INTERFAZ STREAMLIT v3.0 ============
 
     # --- BARRA LATERAL: CONFIGURACIÓN AVANZADA ---
@@ -1042,7 +1425,25 @@ elif menu == "🏠 App Principal":
                     "Value Score": value_analysis,
                     "KL Divergence": kl_analysis
                 })
-            
+                # ============ GUARDAR PARA RECOMENDACIÓN ============
+
+                # Guarda los resultados en session_state para usarlos después
+                st.session_state['resultados_analisis'] = resultados_analisis
+                st.session_state['analisis_completo'] = {
+                    'team_h': team_h,
+                    'team_a': team_a,
+                    'liga': liga,
+                    'or_val': or_val,
+                    'entropia': entropia_auto,
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+
+                # También guarda las probabilidades numéricas para cálculos
+                st.session_state['probabilidades_numericas'] = {
+                    '1': p1_mc,  # Asegúrate de que estas variables existan
+                    'X': px_mc,
+                    '2': p2_mc
+                }
             # Crear tabla de resultados
             df_resultados = pd.DataFrame([
                 {
@@ -1061,6 +1462,9 @@ elif menu == "🏠 App Principal":
             ])
             
             st.dataframe(df_resultados, use_container_width=True)
+
+            # Mostrar recomendación y opciones de exportación
+            mostrar_recomendacion_y_exportacion()
             
             # Identificar picks con valor
             picks_con_valor = []
@@ -1374,5 +1778,412 @@ elif menu == "🏠 App Principal":
         st.markdown("ROI: 12-18% | Sharpe: 1.5-2.0 | CVaR: < 15%")
 
     st.markdown("---")
+
+        # ============ INTEGRACIÓN EN LA APP ============
+
+    def agregar_modulo_recomendacion():
+        """
+        Módulo completo para añadir a tu app actual
+        """
+        
+        # Inicializar componentes
+        recomendador = RecomendadorInteligente()
+        exportador = ExportadorAnalisis()
+        
+        # Crear sección de recomendación
+        st.markdown("---")
+        st.header("🎯 RECOMENDACIÓN FINAL DE APUESTA")
+        
+        # Aquí debes pasar el análisis completo de tu app
+        # Suponiendo que tienes estas variables disponibles:
+        # - resultados_analisis (lista de dicts con los resultados)
+        # - analisis_completo (dict con metadata del análisis)
+        
+        # Esto es un ejemplo - debes adaptar a tus variables reales
+        resultados_analisis = st.session_state.get('resultados', [])
+        analisis_completo = st.session_state.get('analisis_completo', {})
+        
+        if not resultados_analisis:
+            st.warning("No hay datos de análisis disponibles. Ejecuta el análisis primero.")
+            return
+        
+        # Generar recomendación
+        recomendacion = recomendador.generar_recomendacion({
+            'resultados': resultados_analisis,
+            **analisis_completo
+        })
+        
+        # Mostrar recomendación
+        col_rec1, col_rec2, col_rec3 = st.columns([2, 1, 1])
+        
+        with col_rec1:
+            # Visualización de la recomendación
+            if recomendacion['pick']:
+                # Caso: Hay recomendación de apuesta
+                st.markdown(f"""
+                ### 🎰 **{recomendacion['accion']}**
+                
+                **Pick:** **{recomendacion['pick']}** @ {recomendacion['cuota']:.2f}
+                
+                **Confianza:** {recomendacion['confianza']:.0f}%
+                **Expected Value:** {recomendacion['ev']:.2%}
+                **Stake Recomendado:** {recomendacion['stake_pct']}
+                """)
+                
+                # Barra de confianza visual
+                confianza_pct = recomendacion['confianza']
+                st.progress(confianza_pct/100, text=f"Confianza: {confianza_pct:.0f}%")
+                
+            else:
+                # Caso: No apostar
+                st.markdown("""
+                ### ⛔ **NO APOSTAR**
+                
+                **Motivo:** No se detectaron oportunidades con value suficiente.
+                
+                **Recomendación:** Buscar otros partidos o esperar cambios en el mercado.
+                """)
+        
+        with col_rec2:
+            # Razones para la recomendación
+            st.subheader("✅ Razones")
+            for razon in recomendacion['razones']:
+                st.info(f"• {razon}")
+        
+        with col_rec3:
+            # Advertencias
+            if recomendacion['advertencias']:
+                st.subheader("⚠️ Advertencias")
+                for adv in recomendacion['advertencias']:
+                    st.warning(f"• {adv}")
+        
+        # Mostrar detalles del pick recomendado
+        if recomendacion['pick']:
+            st.markdown("---")
+            st.subheader("📊 Detalles del Pick Recomendado")
+            
+            # Encontrar el resultado correspondiente
+            pick_data = next((r for r in resultados_analisis if r['Resultado'] == recomendacion['pick']), None)
+            
+            if pick_data:
+                col_det1, col_det2, col_det3, col_det4 = st.columns(4)
+                
+                with col_det1:
+                    st.metric("Probabilidad Modelo", pick_data['Prob Modelo'])
+                    st.metric("Cuota Justa", pick_data.get('Cuota Justa', 'N/A'))
+                
+                with col_det2:
+                    st.metric("Cuota Mercado", pick_data['Cuota Mercado'])
+                    st.metric("Diferencia", pick_data.get('Delta', 'N/A'))
+                
+                with col_det3:
+                    st.metric("Value (EV)", pick_data['EV'])
+                    st.metric("Stake Kelly", pick_data.get('Stake %', '0%'))
+                
+                with col_det4:
+                    if 'Value Score' in pick_data:
+                        st.metric("Value Score", pick_data['Value Score'])
+                    st.metric("Significativo", pick_data.get('Significativo', 'N/A'))
+        
+        # Sección de exportación
+        st.markdown("---")
+        st.header("📥 EXPORTAR ANÁLISIS")
+        
+        col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
+        
+        with col_exp1:
+            if st.button("💾 CSV", use_container_width=True):
+                csv_data = exportador.exportar_csv(resultados_analisis, recomendacion['metadata'])
+                st.download_button(
+                    label="Descargar CSV",
+                    data=csv_data,
+                    file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        with col_exp2:
+            if st.button("📄 JSON", use_container_width=True):
+                json_data = exportador.exportar_json(resultados_analisis, recomendacion['metadata'])
+                st.download_button(
+                    label="Descargar JSON",
+                    data=json_data,
+                    file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+        
+        with col_exp3:
+            if st.button("📊 PDF", use_container_width=True):
+                pdf_buffer = exportador.exportar_pdf(recomendacion, resultados_analisis, analisis_completo)
+                st.download_button(
+                    label="Descargar PDF",
+                    data=pdf_buffer,
+                    file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+        
+        with col_exp4:
+            if st.button("🌐 HTML", use_container_width=True):
+                html_data = exportador.exportar_resumen_html(recomendacion, resultados_analisis)
+                st.download_button(
+                    label="Descargar HTML",
+                    data=html_data,
+                    file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+        
+        # Vista previa del reporte
+        with st.expander("👁️ Vista Previa del Reporte", expanded=False):
+            if recomendacion['pick']:
+                st.success(f"""
+                **Reporte Generado:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                
+                **Recomendación:** {recomendacion['accion']}
+                **Pick:** {recomendacion['pick']}
+                **Cuota:** {recomendacion['cuota']:.2f}
+                **Confianza:** {recomendacion['confianza']:.0f}%
+                **Expected Value:** {recomendacion['ev']:.2%}
+                
+                **Equipos:** {recomendacion['metadata'].get('equipo_local', '')} vs {recomendacion['metadata'].get('equipo_visitante', '')}
+                **Liga:** {recomendacion['metadata'].get('liga', '')}
+                """)
+            else:
+                st.info("No hay recomendación de apuesta para este análisis.")
+        
+        # Guardar en historial interno
+        if st.button("📝 Guardar en Historial Interno", use_container_width=True):
+            if 'historial' not in st.session_state:
+                st.session_state.historial = []
+            
+            registro = {
+                'timestamp': datetime.now(),
+                'recomendacion': recomendacion,
+                'resultados': resultados_analisis,
+                'metadata': analisis_completo
+            }
+            
+            st.session_state.historial.append(registro)
+            st.success(f"✅ Análisis guardado. Total en historial: {len(st.session_state.historial)}")
+        
+        # Mostrar historial si existe
+        if 'historial' in st.session_state and st.session_state.historial:
+            with st.expander("📚 Ver Historial de Análisis", expanded=False):
+                for i, registro in enumerate(reversed(st.session_state.historial[-5:]), 1):
+                    fecha = registro['timestamp'].strftime("%Y-%m-%d %H:%M")
+                    rec = registro['recomendacion']
+                    
+                    if rec['pick']:
+                        st.markdown(f"""
+                        **{i}. {fecha}** - {rec['accion']} en {rec['pick']} @ {rec['cuota']:.2f}
+                        """)
+                    else:
+                        st.markdown(f"""
+                        **{i}. {fecha}** - {rec['accion']}
+                        """)
+                
+                # Opción para exportar todo el historial
+                if st.button("📦 Exportar Todo el Historial"):
+                    historial_data = {
+                        'version': 'ACBE-Kelly v3.0',
+                        'generated': datetime.now().isoformat(),
+                        'total_analisis': len(st.session_state.historial),
+                        'analisis': st.session_state.historial
+                    }
+                    
+                    json_historial = json.dumps(historial_data, indent=2, default=str)
+                    
+                    st.download_button(
+                        label="Descargar Historial Completo",
+                        data=json_historial,
+                        file_name=f"acbe_historial_completo_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                        mime="application/json"
+                    )
+
+    # ============ INTEGRACIÓN EN TU APP EXISTENTE ============
+
+    def integrar_en_tu_app():
+        """
+        Instrucciones para integrar este módulo en tu app existente
+        """
+        
+        st.markdown("""
+        ## 🔧 INSTRUCCIONES DE INTEGRACIÓN
+        
+        Para añadir las funcionalidades de recomendación y exportación a tu app ACBE-Kelly:
+        
+        ### 1. **AÑADE LAS CLASES AL PRINCIPIO**
+        Copia las clases `RecomendadorInteligente` y `ExportadorAnalisis` al inicio de tu `app.py`.
+        
+        ### 2. **GUARDA LOS RESULTADOS EN session_state**
+        Después de tu análisis, guarda los resultados:
+        
+        ```python
+        # Al final de tu análisis (después de calcular resultados_analisis)
+        st.session_state['resultados'] = resultados_analisis
+        st.session_state['analisis_completo'] = {
+            'team_h': team_h,
+            'team_a': team_a,
+            'liga': liga,
+            'or_val': or_val,
+            'entropia': entropia_auto,
+            'timestamp': datetime.now()
+        }
+        ```
+        
+        ### 3. **LLAMA AL MÓDULO**
+        Justo después de mostrar tus resultados, añade:
+        
+        ```python
+        # Importa la función
+        from recomendacion_exportacion import agregar_modulo_recomendacion
+        
+        # Llama al módulo
+        agregar_modulo_recomendacion()
+        ```
+        
+        ### 4. **INSTALA DEPENDENCIAS ADICIONALES**
+        Añade a tu `requirements.txt`:
+        
+        ```txt
+        reportlab==4.0.4
+        ```
+        
+        ### 5. **PRUEBA LA INTEGRACIÓN**
+        Ejecuta tu app y verifica que:
+        1. Aparezca la sección "RECOMENDACIÓN FINAL DE APUESTA"
+        2. Se muestren las opciones de exportación (CSV, JSON, PDF, HTML)
+        3. El historial funcione correctamente
+        
+        ## 🎯 FUNCIONALIDADES AÑADIDAS:
+        
+        1. **🎰 Recomendación clara** (APOSTAR 1/X/2 o NO APOSTAR)
+        2. **📊 Nivel de confianza** calculado automáticamente
+        3. **✅ Razones explicadas** de la recomendación
+        4. **⚠️ Advertencias** de riesgo identificadas
+        5. **📥 Exportación múltiple** (CSV, JSON, PDF, HTML)
+        6. **📚 Historial interno** de análisis
+        7. **💾 Guardado automático** en session_state
+        8. **📦 Exportación completa** del historial
+        
+        ## 🔄 FLUJO DEL USUARIO:
+        
+        ```mermaid
+        graph LR
+        A[Ejecuta Análisis] --> B[Resultados Técnicos]
+        B --> C{¿Value > 2%?}
+        C -->|Sí| D[🎯 RECOMENDACIÓN APOSTAR]
+        C -->|No| E[⛔ RECOMENDACIÓN NO APOSTAR]
+        D --> F[📥 Exportar Análisis]
+        E --> F
+        F --> G[💾 Guardar en Historial]
+        G --> H[📚 Revisar Historial]
+        ```
+        """)
+
+    # ============ EJEMPLO DE USO COMPLETO ============
+
+    def ejemplo_uso_completo():
+        """
+        Ejemplo completo de cómo quedaría integrado
+        """
+        
+        # Simular datos de ejemplo (esto reemplazarías con tus datos reales)
+        resultados_ejemplo = [
+            {
+                'Resultado': '1',
+                'Prob Modelo': '45.2%',
+                'Cuota Mercado': '2.90',
+                'Cuota Justa': '2.21',
+                'EV': '+12.5%',
+                'Value Score': '2.1',
+                'Significativo': '✅',
+                'Delta': '+5.2%',
+                'Stake %': '3.8%'
+            },
+            {
+                'Resultado': 'X',
+                'Prob Modelo': '28.7%',
+                'Cuota Mercado': '3.25',
+                'Cuota Justa': '3.48',
+                'EV': '-2.3%',
+                'Value Score': '0.8',
+                'Significativo': '❌',
+                'Delta': '-2.1%',
+                'Stake %': 'NO BET'
+            },
+            {
+                'Resultado': '2',
+                'Prob Modelo': '26.1%',
+                'Cuota Mercado': '2.45',
+                'Cuota Justa': '3.83',
+                'EV': '-15.2%',
+                'Value Score': '-1.5',
+                'Significativo': '❌',
+                'Delta': '-9.8%',
+                'Stake %': 'NO BET'
+            }
+        ]
+        
+        analisis_completo_ejemplo = {
+            'team_h': 'Bologna',
+            'team_a': 'AC Milan',
+            'liga': 'Serie A',
+            'or_val': 0.062,
+            'entropia': 0.58,
+            'timestamp': datetime.now()
+        }
+        
+        # Guardar en session_state
+        st.session_state['resultados'] = resultados_ejemplo
+        st.session_state['analisis_completo'] = analisis_completo_ejemplo
+        
+        # Ejecutar módulo
+        agregar_modulo_recomendacion()
+
+    # ============ PANTALLA PRINCIPAL ============
+
+    def main():
+        """
+        Pantalla principal de demostración
+        """
+        st.set_page_config(page_title="ACBE-Kelly Recomendación & Exportación", layout="wide")
+        
+        st.title("🎯 Sistema de Recomendación y Exportación ACBE-Kelly")
+        st.markdown("---")
+        
+        opcion = st.sidebar.radio(
+            "Selecciona una opción:",
+            ["📋 Instrucciones de Integración", 
+            "🎮 Ejemplo de Uso", 
+            "🧩 Módulos Individuales"]
+        )
+        
+        if opcion == "📋 Instrucciones de Integración":
+            integrar_en_tu_app()
+        
+        elif opcion == "🎮 Ejemplo de Uso":
+            st.info("Ejecutando ejemplo con datos simulados...")
+            ejemplo_uso_completo()
+        
+        elif opcion == "🧩 Módulos Individuales":
+            st.subheader("🔧 Módulos Disponibles")
+            
+            with st.expander("🎯 RecomendadorInteligente", expanded=False):
+                st.code(inspect.getsource(RecomendadorInteligente), language='python')
+            
+            with st.expander("📥 ExportadorAnalisis", expanded=False):
+                st.code(inspect.getsource(ExportadorAnalisis), language='python')
+            
+            with st.expander("📊 agregar_modulo_recomendacion", expanded=False):
+                st.code(inspect.getsource(agregar_modulo_recomendacion), language='python')
+
+    # Ejecutar si se corre directamente
+    if __name__ == "__main__":
+        import inspect
+        main()
+
     st.caption("© 2024 ACBE Predictive Systems | Para uso educativo y profesional. Apuestas conllevan riesgo de pérdida.")
     pass
