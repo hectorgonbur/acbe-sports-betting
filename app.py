@@ -63,7 +63,7 @@ if menu == "🎓 Guía Interactiva":
             """)
         
         with col2:
-            st.image("https://i.imgur.com/4Q2Z3Q9.png", caption="Flujo del Sistema")
+            st.write("📍 **Imagen del sistema**")
         
         st.markdown("---")
         
@@ -214,26 +214,117 @@ if menu == "🎓 Guía Interactiva":
     # ============ MÓDULO 3: MONTE CARLO ============
     elif modulo == "🎲 Fase 2: Monte Carlo":
         # ... (TODO el código del módulo 3)
+        st.header("🎲 Fase 2: Simulación Monte Carlo")
+        
+        st.markdown("### 🎯 Simular miles de partidos")
+        
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            lambda_local = st.slider("λ Local", 0.5, 3.0, 1.5)
+        
+        with col_m2:
+            lambda_visit = st.slider("λ Visitante", 0.5, 3.0, 1.2)
+        
+        if st.button("🎲 Ejecutar 1000 simulaciones"):
+            resultados = []
+            for _ in range(1000):
+                goles_local = np.random.poisson(lambda_local)
+                goles_visit = np.random.poisson(lambda_visit)
+                
+                if goles_local > goles_visit:
+                    resultados.append("1")
+                elif goles_local == goles_visit:
+                    resultados.append("X")
+                else:
+                    resultados.append("2")
+            
+            p1 = resultados.count("1") / 1000
+            px = resultados.count("X") / 1000
+            p2 = resultados.count("2") / 1000
+            
+            st.success(f"**Resultados:** Local: {p1:.1%} | Empate: {px:.1%} | Visitante: {p2:.1%}")
         pass
 
     # ============ MÓDULO 4: GESTIÓN DE CAPITAL ============
     elif modulo == "💰 Fase 3: Gestión de Capital":
         # ... (TODO el código del módulo 4)
+        st.header("💰 Fase 3: Gestión de Capital (Kelly Criterio)")
+        
+        col_k1, col_k2 = st.columns(2)
+        
+        with col_k1:
+            prob = st.slider("Probabilidad (%)", 30, 70, 45) / 100
+        
+        with col_k2:
+            cuota = st.slider("Cuota", 1.5, 4.0, 2.5)
+            b = cuota - 1
+        
+        if b > 0:
+            kelly_base = (prob * b - (1 - prob)) / b
+            kelly_final = kelly_base * 0.5  # Half-Kelly
+        else:
+            kelly_final = 0
+        
+        st.info(f"**Stake recomendado:** {kelly_final:.1%} del bankroll")
         pass
 
     # ============ MÓDULO 5: BACKTESTING ============
     elif modulo == "📊 Fase 4: Backtesting":
         # ... (TODO el código del módulo 5)
+        st.header("📊 Fase 4: Backtesting Sintético")
+        
+        if st.button("📊 Simular 100 apuestas"):
+            bankroll = 1000
+            historial = [bankroll]
+            
+            for i in range(100):
+                stake = bankroll * 0.02  # 2% por apuesta
+                
+                if np.random.random() < 0.55:  # 55% de acierto
+                    bankroll += stake * 1.2  # Ganancia del 20%
+                else:
+                    bankroll -= stake
+                
+                historial.append(bankroll)
+            
+            roi = ((bankroll - 1000) / 1000) * 100
+            st.metric("Bankroll Final", f"€{bankroll:.0f}")
+            st.metric("ROI", f"{roi:.1f}%")
         pass
 
     # ============ MÓDULO 6: EJEMPLO PRÁCTICO ============
     elif modulo == "🎯 Ejemplo Práctico":
         # ... (TODO el código del módulo 6)
+        st.header("🎯 Ejemplo Práctico: Bologna vs AC Milan")
+        
+        st.markdown("""
+        **Análisis completo:**
+        - 📊 **Modelo:** 45% probabilidad de victoria local
+        - 💰 **Mercado:** 34% probabilidad implícita (cuota 2.90)
+        - 🎯 **Value:** +14.5% (oportunidad clara)
+        - 🏦 **Stake:** 3.8% del bankroll (Half-Kelly)
+        
+        **✅ RECOMENDACIÓN: APOSTAR**
+        """)
         pass
 
     # ============ MÓDULO 7: SIMULADOR INTERACTIVO ============
     elif modulo == "📈 Simulador Interactivo":
         # ... (TODO el código del módulo 7)
+        st.header("📈 Simulador Interactivo")
+        
+        prob = st.slider("Tu estimación (%)", 30, 70, 45)
+        cuota = st.slider("Cuota ofrecida", 1.5, 4.0, 2.5)
+        
+        ev = (prob/100 * cuota) - 1
+        
+        if ev > 0.03:
+            st.success(f"🎯 **APOSTAR** - Value = {ev:+.1%}")
+        elif ev > 0:
+            st.info(f"📊 **Considerar** - Value = {ev:+.1%}")
+        else:
+            st.warning(f"⚠️ **NO APOSTAR** - Value = {ev:+.1%}")
         pass
 
     # ============ PIE DE PÁGINA ============
