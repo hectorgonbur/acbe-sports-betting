@@ -13,7 +13,6 @@ if menu == "🎓 Guía Interactiva":
     🎓 GUÍA INTERACTIVA ACBE-KELLY v3.0
     Sistema de aprendizaje paso a paso
     """
-
     import streamlit as st
     import pandas as pd
     import numpy as np
