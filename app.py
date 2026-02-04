@@ -1477,7 +1477,7 @@ elif menu == "🏠 App Principal":
             st.dataframe(df_resultados, use_container_width=True)
 
             # Mostrar recomendación y opciones de exportación
-            mostrar_recomendacion_y_exportacion()
+            agregar_modulo_recomendacion()
             
             # Identificar picks con valor
             picks_con_valor = []
