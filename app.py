@@ -1095,6 +1095,230 @@ elif menu == "🏠 App Principal":
                 """
                 
                 return html
+
+            # ============ INTEGRACIÓN EN LA APP ============
+
+    def agregar_modulo_recomendacion():
+        """
+        Módulo completo para añadir a tu app actual
+        """
+        
+        # Inicializar componentes
+        recomendador = RecomendadorInteligente()
+        exportador = ExportadorAnalisis()
+        
+        # Crear sección de recomendación
+        st.markdown("---")
+        st.header("🎯 RECOMENDACIÓN FINAL DE APUESTA")
+        
+        # Aquí debes pasar el análisis completo de tu app
+        # Suponiendo que tienes estas variables disponibles:
+        # - resultados_analisis (lista de dicts con los resultados)
+        # - analisis_completo (dict con metadata del análisis)
+        
+        # Esto es un ejemplo - debes adaptar a tus variables reales
+        resultados_analisis = st.session_state.get('resultados', [])
+        analisis_completo = st.session_state.get('analisis_completo', {})
+        
+        if not resultados_analisis:
+            st.warning("No hay datos de análisis disponibles. Ejecuta el análisis primero.")
+            return
+        
+        # Generar recomendación
+        recomendacion = recomendador.generar_recomendacion({
+            'resultados': resultados_analisis,
+            **analisis_completo
+        })
+        
+        # Mostrar recomendación
+        col_rec1, col_rec2, col_rec3 = st.columns([2, 1, 1])
+        
+        with col_rec1:
+            # Visualización de la recomendación
+            if recomendacion['pick']:
+                # Caso: Hay recomendación de apuesta
+                st.markdown(f"""
+                ### 🎰 **{recomendacion['accion']}**
+                
+                **Pick:** **{recomendacion['pick']}** @ {recomendacion['cuota']:.2f}
+                
+                **Confianza:** {recomendacion['confianza']:.0f}%
+                **Expected Value:** {recomendacion['ev']:.2%}
+                **Stake Recomendado:** {recomendacion['stake_pct']}
+                """)
+                
+                # Barra de confianza visual
+                confianza_pct = recomendacion['confianza']
+                st.progress(confianza_pct/100, text=f"Confianza: {confianza_pct:.0f}%")
+                
+            else:
+                # Caso: No apostar
+                st.markdown("""
+                ### ⛔ **NO APOSTAR**
+                
+                **Motivo:** No se detectaron oportunidades con value suficiente.
+                
+                **Recomendación:** Buscar otros partidos o esperar cambios en el mercado.
+                """)
+        
+        with col_rec2:
+            # Razones para la recomendación
+            st.subheader("✅ Razones")
+            for razon in recomendacion['razones']:
+                st.info(f"• {razon}")
+        
+        with col_rec3:
+            # Advertencias
+            if recomendacion['advertencias']:
+                st.subheader("⚠️ Advertencias")
+                for adv in recomendacion['advertencias']:
+                    st.warning(f"• {adv}")
+        
+        # Mostrar detalles del pick recomendado
+        if recomendacion['pick']:
+            st.markdown("---")
+            st.subheader("📊 Detalles del Pick Recomendado")
+            
+            # Encontrar el resultado correspondiente
+            pick_data = next((r for r in resultados_analisis if r['Resultado'] == recomendacion['pick']), None)
+            
+            if pick_data:
+                col_det1, col_det2, col_det3, col_det4 = st.columns(4)
+                
+                with col_det1:
+                    st.metric("Probabilidad Modelo", pick_data['Prob Modelo'])
+                    st.metric("Cuota Justa", pick_data.get('Cuota Justa', 'N/A'))
+                
+                with col_det2:
+                    st.metric("Cuota Mercado", pick_data['Cuota Mercado'])
+                    st.metric("Diferencia", pick_data.get('Delta', 'N/A'))
+                
+                with col_det3:
+                    st.metric("Value (EV)", pick_data['EV'])
+                    st.metric("Stake Kelly", pick_data.get('Stake %', '0%'))
+                
+                with col_det4:
+                    if 'Value Score' in pick_data:
+                        st.metric("Value Score", pick_data['Value Score'])
+                    st.metric("Significativo", pick_data.get('Significativo', 'N/A'))
+        
+        # Sección de exportación
+        st.markdown("---")
+        st.header("📥 EXPORTAR ANÁLISIS")
+        
+        col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
+        
+        with col_exp1:
+            if st.button("💾 CSV", use_container_width=True):
+                csv_data = exportador.exportar_csv(resultados_analisis, recomendacion['metadata'])
+                st.download_button(
+                    label="Descargar CSV",
+                    data=csv_data,
+                    file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        with col_exp2:
+            if st.button("📄 JSON", use_container_width=True):
+                json_data = exportador.exportar_json(resultados_analisis, recomendacion['metadata'])
+                st.download_button(
+                    label="Descargar JSON",
+                    data=json_data,
+                    file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+        
+        with col_exp3:
+            if st.button("📊 PDF", use_container_width=True):
+                pdf_buffer = exportador.exportar_pdf(recomendacion, resultados_analisis, analisis_completo)
+                st.download_button(
+                    label="Descargar PDF",
+                    data=pdf_buffer,
+                    file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+        
+        with col_exp4:
+            if st.button("🌐 HTML", use_container_width=True):
+                html_data = exportador.exportar_resumen_html(recomendacion, resultados_analisis)
+                st.download_button(
+                    label="Descargar HTML",
+                    data=html_data,
+                    file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+        
+        # Vista previa del reporte
+        with st.expander("👁️ Vista Previa del Reporte", expanded=False):
+            if recomendacion['pick']:
+                st.success(f"""
+                **Reporte Generado:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                
+                **Recomendación:** {recomendacion['accion']}
+                **Pick:** {recomendacion['pick']}
+                **Cuota:** {recomendacion['cuota']:.2f}
+                **Confianza:** {recomendacion['confianza']:.0f}%
+                **Expected Value:** {recomendacion['ev']:.2%}
+                
+                **Equipos:** {recomendacion['metadata'].get('equipo_local', '')} vs {recomendacion['metadata'].get('equipo_visitante', '')}
+                **Liga:** {recomendacion['metadata'].get('liga', '')}
+                """)
+            else:
+                st.info("No hay recomendación de apuesta para este análisis.")
+        
+        # Guardar en historial interno
+        if st.button("📝 Guardar en Historial Interno", use_container_width=True):
+            if 'historial' not in st.session_state:
+                st.session_state.historial = []
+            
+            registro = {
+                'timestamp': datetime.now(),
+                'recomendacion': recomendacion,
+                'resultados': resultados_analisis,
+                'metadata': analisis_completo
+            }
+            
+            st.session_state.historial.append(registro)
+            st.success(f"✅ Análisis guardado. Total en historial: {len(st.session_state.historial)}")
+        
+        # Mostrar historial si existe
+        if 'historial' in st.session_state and st.session_state.historial:
+            with st.expander("📚 Ver Historial de Análisis", expanded=False):
+                for i, registro in enumerate(reversed(st.session_state.historial[-5:]), 1):
+                    fecha = registro['timestamp'].strftime("%Y-%m-%d %H:%M")
+                    rec = registro['recomendacion']
+                    
+                    if rec['pick']:
+                        st.markdown(f"""
+                        **{i}. {fecha}** - {rec['accion']} en {rec['pick']} @ {rec['cuota']:.2f}
+                        """)
+                    else:
+                        st.markdown(f"""
+                        **{i}. {fecha}** - {rec['accion']}
+                        """)
+                
+                # Opción para exportar todo el historial
+                if st.button("📦 Exportar Todo el Historial"):
+                    historial_data = {
+                        'version': 'ACBE-Kelly v3.0',
+                        'generated': datetime.now().isoformat(),
+                        'total_analisis': len(st.session_state.historial),
+                        'analisis': st.session_state.historial
+                    }
+                    
+                    json_historial = json.dumps(historial_data, indent=2, default=str)
+                    
+                    st.download_button(
+                        label="Descargar Historial Completo",
+                        data=json_historial,
+                        file_name=f"acbe_historial_completo_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                        mime="application/json"
+                    )
+        
     # ============ INTERFAZ STREAMLIT v3.0 ============
 
     # --- BARRA LATERAL: CONFIGURACIÓN AVANZADA ---
@@ -1791,229 +2015,6 @@ elif menu == "🏠 App Principal":
         st.markdown("ROI: 12-18% | Sharpe: 1.5-2.0 | CVaR: < 15%")
 
     st.markdown("---")
-
-        # ============ INTEGRACIÓN EN LA APP ============
-
-    def agregar_modulo_recomendacion():
-        """
-        Módulo completo para añadir a tu app actual
-        """
-        
-        # Inicializar componentes
-        recomendador = RecomendadorInteligente()
-        exportador = ExportadorAnalisis()
-        
-        # Crear sección de recomendación
-        st.markdown("---")
-        st.header("🎯 RECOMENDACIÓN FINAL DE APUESTA")
-        
-        # Aquí debes pasar el análisis completo de tu app
-        # Suponiendo que tienes estas variables disponibles:
-        # - resultados_analisis (lista de dicts con los resultados)
-        # - analisis_completo (dict con metadata del análisis)
-        
-        # Esto es un ejemplo - debes adaptar a tus variables reales
-        resultados_analisis = st.session_state.get('resultados', [])
-        analisis_completo = st.session_state.get('analisis_completo', {})
-        
-        if not resultados_analisis:
-            st.warning("No hay datos de análisis disponibles. Ejecuta el análisis primero.")
-            return
-        
-        # Generar recomendación
-        recomendacion = recomendador.generar_recomendacion({
-            'resultados': resultados_analisis,
-            **analisis_completo
-        })
-        
-        # Mostrar recomendación
-        col_rec1, col_rec2, col_rec3 = st.columns([2, 1, 1])
-        
-        with col_rec1:
-            # Visualización de la recomendación
-            if recomendacion['pick']:
-                # Caso: Hay recomendación de apuesta
-                st.markdown(f"""
-                ### 🎰 **{recomendacion['accion']}**
-                
-                **Pick:** **{recomendacion['pick']}** @ {recomendacion['cuota']:.2f}
-                
-                **Confianza:** {recomendacion['confianza']:.0f}%
-                **Expected Value:** {recomendacion['ev']:.2%}
-                **Stake Recomendado:** {recomendacion['stake_pct']}
-                """)
-                
-                # Barra de confianza visual
-                confianza_pct = recomendacion['confianza']
-                st.progress(confianza_pct/100, text=f"Confianza: {confianza_pct:.0f}%")
-                
-            else:
-                # Caso: No apostar
-                st.markdown("""
-                ### ⛔ **NO APOSTAR**
-                
-                **Motivo:** No se detectaron oportunidades con value suficiente.
-                
-                **Recomendación:** Buscar otros partidos o esperar cambios en el mercado.
-                """)
-        
-        with col_rec2:
-            # Razones para la recomendación
-            st.subheader("✅ Razones")
-            for razon in recomendacion['razones']:
-                st.info(f"• {razon}")
-        
-        with col_rec3:
-            # Advertencias
-            if recomendacion['advertencias']:
-                st.subheader("⚠️ Advertencias")
-                for adv in recomendacion['advertencias']:
-                    st.warning(f"• {adv}")
-        
-        # Mostrar detalles del pick recomendado
-        if recomendacion['pick']:
-            st.markdown("---")
-            st.subheader("📊 Detalles del Pick Recomendado")
-            
-            # Encontrar el resultado correspondiente
-            pick_data = next((r for r in resultados_analisis if r['Resultado'] == recomendacion['pick']), None)
-            
-            if pick_data:
-                col_det1, col_det2, col_det3, col_det4 = st.columns(4)
-                
-                with col_det1:
-                    st.metric("Probabilidad Modelo", pick_data['Prob Modelo'])
-                    st.metric("Cuota Justa", pick_data.get('Cuota Justa', 'N/A'))
-                
-                with col_det2:
-                    st.metric("Cuota Mercado", pick_data['Cuota Mercado'])
-                    st.metric("Diferencia", pick_data.get('Delta', 'N/A'))
-                
-                with col_det3:
-                    st.metric("Value (EV)", pick_data['EV'])
-                    st.metric("Stake Kelly", pick_data.get('Stake %', '0%'))
-                
-                with col_det4:
-                    if 'Value Score' in pick_data:
-                        st.metric("Value Score", pick_data['Value Score'])
-                    st.metric("Significativo", pick_data.get('Significativo', 'N/A'))
-        
-        # Sección de exportación
-        st.markdown("---")
-        st.header("📥 EXPORTAR ANÁLISIS")
-        
-        col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
-        
-        with col_exp1:
-            if st.button("💾 CSV", use_container_width=True):
-                csv_data = exportador.exportar_csv(resultados_analisis, recomendacion['metadata'])
-                st.download_button(
-                    label="Descargar CSV",
-                    data=csv_data,
-                    file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-        
-        with col_exp2:
-            if st.button("📄 JSON", use_container_width=True):
-                json_data = exportador.exportar_json(resultados_analisis, recomendacion['metadata'])
-                st.download_button(
-                    label="Descargar JSON",
-                    data=json_data,
-                    file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-        
-        with col_exp3:
-            if st.button("📊 PDF", use_container_width=True):
-                pdf_buffer = exportador.exportar_pdf(recomendacion, resultados_analisis, analisis_completo)
-                st.download_button(
-                    label="Descargar PDF",
-                    data=pdf_buffer,
-                    file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-        
-        with col_exp4:
-            if st.button("🌐 HTML", use_container_width=True):
-                html_data = exportador.exportar_resumen_html(recomendacion, resultados_analisis)
-                st.download_button(
-                    label="Descargar HTML",
-                    data=html_data,
-                    file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
-                    mime="text/html",
-                    use_container_width=True
-                )
-        
-        # Vista previa del reporte
-        with st.expander("👁️ Vista Previa del Reporte", expanded=False):
-            if recomendacion['pick']:
-                st.success(f"""
-                **Reporte Generado:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                
-                **Recomendación:** {recomendacion['accion']}
-                **Pick:** {recomendacion['pick']}
-                **Cuota:** {recomendacion['cuota']:.2f}
-                **Confianza:** {recomendacion['confianza']:.0f}%
-                **Expected Value:** {recomendacion['ev']:.2%}
-                
-                **Equipos:** {recomendacion['metadata'].get('equipo_local', '')} vs {recomendacion['metadata'].get('equipo_visitante', '')}
-                **Liga:** {recomendacion['metadata'].get('liga', '')}
-                """)
-            else:
-                st.info("No hay recomendación de apuesta para este análisis.")
-        
-        # Guardar en historial interno
-        if st.button("📝 Guardar en Historial Interno", use_container_width=True):
-            if 'historial' not in st.session_state:
-                st.session_state.historial = []
-            
-            registro = {
-                'timestamp': datetime.now(),
-                'recomendacion': recomendacion,
-                'resultados': resultados_analisis,
-                'metadata': analisis_completo
-            }
-            
-            st.session_state.historial.append(registro)
-            st.success(f"✅ Análisis guardado. Total en historial: {len(st.session_state.historial)}")
-        
-        # Mostrar historial si existe
-        if 'historial' in st.session_state and st.session_state.historial:
-            with st.expander("📚 Ver Historial de Análisis", expanded=False):
-                for i, registro in enumerate(reversed(st.session_state.historial[-5:]), 1):
-                    fecha = registro['timestamp'].strftime("%Y-%m-%d %H:%M")
-                    rec = registro['recomendacion']
-                    
-                    if rec['pick']:
-                        st.markdown(f"""
-                        **{i}. {fecha}** - {rec['accion']} en {rec['pick']} @ {rec['cuota']:.2f}
-                        """)
-                    else:
-                        st.markdown(f"""
-                        **{i}. {fecha}** - {rec['accion']}
-                        """)
-                
-                # Opción para exportar todo el historial
-                if st.button("📦 Exportar Todo el Historial"):
-                    historial_data = {
-                        'version': 'ACBE-Kelly v3.0',
-                        'generated': datetime.now().isoformat(),
-                        'total_analisis': len(st.session_state.historial),
-                        'analisis': st.session_state.historial
-                    }
-                    
-                    json_historial = json.dumps(historial_data, indent=2, default=str)
-                    
-                    st.download_button(
-                        label="Descargar Historial Completo",
-                        data=json_historial,
-                        file_name=f"acbe_historial_completo_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                        mime="application/json"
-                    )
 
     # ============ INTEGRACIÓN EN TU APP EXISTENTE ============
 
