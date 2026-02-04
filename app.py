@@ -717,7 +717,7 @@ elif menu == "🏠 App Principal":
             }
         # ============ CLASE PARA RECOMENDACIONES INTELIGENTES ============
 
-        class RecomendadorInteligente:
+    class RecomendadorInteligente:
             """
             Sistema de recomendación con niveles de confianza y explicaciones
             """
@@ -879,9 +879,9 @@ elif menu == "🏠 App Principal":
                     'metadata': {}
                 }
 
-        # ============ SISTEMA DE EXPORTACIÓN ============
+    # ============ SISTEMA DE EXPORTACIÓN ============
 
-        class ExportadorAnalisis:
+    class ExportadorAnalisis:
             """
             Exporta análisis a múltiples formatos
             """
@@ -1094,7 +1094,7 @@ elif menu == "🏠 App Principal":
                 </html>
                 """
                 
-                return html
+                return html   
 
             # ============ INTEGRACIÓN EN LA APP ============
 
