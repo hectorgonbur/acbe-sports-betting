@@ -1089,7 +1089,7 @@ if menu == "🎓 Guía Interactiva":
     pass
 elif menu == "🏠 App Principal":
     # Tu código actual de la app
-        """
+    """
     🏛️ SISTEMA ACBE-KELLY v3.0 (BAYESIANO COMPLETO - IMPLEMENTACIÓN PRÁCTICA)
     OBJETIVO: ROI 12-18% con CVaR < 15%
     """
