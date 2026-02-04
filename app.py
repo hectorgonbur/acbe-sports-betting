@@ -361,6 +361,7 @@ elif menu == "🏠 App Principal":
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
     from reportlab.lib.utils import ImageReader
+    from scipy import stats
     
     # ============ CONFIGURACIÓN AVANZADA ============
     st.title("🏛️ Sistema ACBE-Kelly v3.0 (Bayesiano Completo)")
