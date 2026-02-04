@@ -1396,6 +1396,13 @@ elif menu == "🏠 App Principal":
             px_mercado = 1 / cx
             p2_mercado = 1 / c2
             
+            # ============ CALCULAR ENTROPÍA AUTO ============
+            # Calcula entropía de Shannon de las probabilidades del mercado
+            import numpy as np
+            prob_mercado_array = np.array([p1_mercado, px_mercado, p2_mercado])
+            prob_mercado_array = prob_mercado_array[prob_mercado_array > 0]  # Evitar log(0)
+            entropia_auto = -np.sum(prob_mercado_array * np.log2(prob_mercado_array))
+            
             # Análisis para cada resultado
             resultados_analisis = []
             
@@ -1429,25 +1436,27 @@ elif menu == "🏠 App Principal":
                     "Value Score": value_analysis,
                     "KL Divergence": kl_analysis
                 })
-                # ============ GUARDAR PARA RECOMENDACIÓN ============
+                # ============ QUITAMOS EL GUARDADO DE SESSION_STATE DE AQUÍ ============
+            
+            # ============ AQUÍ MOVEMOS EL GUARDADO (FUERA DEL LOOP) ============
+            # Ahora guardamos en session_state UNA SOLA VEZ, después del loop
+            st.session_state['resultados_analisis'] = resultados_analisis
+            st.session_state['analisis_completo'] = {
+                'team_h': team_h,
+                'team_a': team_a,
+                'liga': liga,
+                'or_val': or_val,
+                'entropia': entropia_auto,  # Ahora sí está definida
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
 
-                # Guarda los resultados en session_state para usarlos después
-                st.session_state['resultados_analisis'] = resultados_analisis
-                st.session_state['analisis_completo'] = {
-                    'team_h': team_h,
-                    'team_a': team_a,
-                    'liga': liga,
-                    'or_val': or_val,
-                    'entropia': entropia_auto,
-                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-
-                # También guarda las probabilidades numéricas para cálculos
-                st.session_state['probabilidades_numericas'] = {
-                    '1': p1_mc,  # Asegúrate de que estas variables existan
-                    'X': px_mc,
-                    '2': p2_mc
-                }
+            # También guarda las probabilidades numéricas para cálculos
+            st.session_state['probabilidades_numericas'] = {
+                '1': p1_mc,
+                'X': px_mc,
+                '2': p2_mc
+            }
+            
             # Crear tabla de resultados
             df_resultados = pd.DataFrame([
                 {
