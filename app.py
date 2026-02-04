@@ -1081,7 +1081,7 @@ st.markdown("""
 """)
 
 st.caption("© 2024 ACBE Predictive Systems | Guía educativa para aprendizaje interactivo")
-    pass
+pass
 elif menu == "🏠 App Principal":
     # Tu código actual de la app
     """
