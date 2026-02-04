@@ -9,7 +9,13 @@ menu = st.sidebar.selectbox(
 
 if menu == "🎓 Guía Interactiva":
     # Copia aquí TODO el código de la guía
-        """
+    # Configuración de la guía
+    st.set_page_config(...)
+    st.title(...)
+    
+    # Sidebar de la guía
+    modulo = st.sidebar.radio(...)
+    """
     🎓 GUÍA INTERACTIVA ACBE-KELLY v3.0
     Sistema de aprendizaje paso a paso
     """
