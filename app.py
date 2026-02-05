@@ -1837,54 +1837,6 @@ elif menu == "🏠 App Principal":
                 agregar_modulo_recomendacion()
                 st.session_state['recomendacion_ejecutada'] = True
                 
-        with st.spinner("💰 CALCULANDO GESTIÓN DE CAPITAL..."):
-            st.subheader("🎯 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
-            
-            # Obtener picks de la Fase 3
-            picks_con_valor = st.session_state.get('picks_con_valor', [])
-            
-            if not picks_con_valor:
-                st.warning("⚠️ No hay picks con valor - Saltando Fase 4")
-        
-            recomendaciones = []
-            
-            # Configurar bankroll
-            bankroll = 1000  # Se puede hacer configurable
-                   
-            # Ejecutar fase 4
-        try:
-            # Primero verificamos si hay picks con valor
-            if picks_con_valor and len(picks_con_valor) > 0:
-                recomendaciones = ejecutar_fase_4(
-                    picks_con_valor, 
-                    gestor_riesgo, 
-                    backtester, 
-                    bankroll,
-                    posterior_local,
-                    posterior_visitante,
-                    entropia_auto,  # Ahora coincide con el parámetro de la función
-                    roi_target
-                )
-                
-                # Mostrar recomendaciones si las hay
-                if recomendaciones and len(recomendaciones) > 0:
-                    mostrar_recomendaciones(recomendaciones, roi_target)
-                else:
-                    st.info("📭 No hay picks con valor para gestionar capital")
-                    recomendaciones = []  # Asegurar lista vacía
-                    
-            else:
-                st.info("📭 No hay picks con valor para gestionar capital")
-                recomendaciones = []  # Asegurar lista vacía
-                
-        except Exception as e:
-            st.error(f"❌ Error en Fase 4: {str(e)}")
-            st.info("Continuando con Fase 5 sin recomendaciones...")
-            recomendaciones = []  # Asegurar lista vacía en caso de error
-    
-        # 🔴🔴🔴 GUARDAR PARA FASE 5 🔴🔴🔴
-        st.session_state['recomendaciones_fase4'] = recomendaciones
-
         def ejecutar_fase_4(picks_con_valor, gestor_riesgo, backtester, bankroll=1000, 
                     posterior_local=None, posterior_visitante=None, 
                     entropia_mercado=0.6, roi_target=12):
@@ -2065,6 +2017,55 @@ elif menu == "🏠 App Principal":
                 # Mostrar picks rechazados (opcional para debugging)
                 elif st.session_state.get('debug_mode', False):
                     st.warning(f"❌ **{rec['resultado']}** - EV: {rec['ev']} - Stake: 0% - Razón: {rec.get('razon_kelly', 'No calculado')}")
+                
+        with st.spinner("💰 CALCULANDO GESTIÓN DE CAPITAL..."):
+            st.subheader("🎯 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
+            
+            # Obtener picks de la Fase 3
+            picks_con_valor = st.session_state.get('picks_con_valor', [])
+            
+            if not picks_con_valor:
+                st.warning("⚠️ No hay picks con valor - Saltando Fase 4")
+        
+            recomendaciones = []
+            
+            
+            # Configurar bankroll
+            bankroll = 1000  # Se puede hacer configurable
+                   
+            # Ejecutar fase 4
+        try:
+            # Primero verificamos si hay picks con valor
+            if picks_con_valor and len(picks_con_valor) > 0:
+                recomendaciones = ejecutar_fase_4(
+                    picks_con_valor, 
+                    gestor_riesgo, 
+                    backtester, 
+                    bankroll,
+                    posterior_local,
+                    posterior_visitante,
+                    entropia_auto,  # Ahora coincide con el parámetro de la función
+                    roi_target
+                )
+                
+                # Mostrar recomendaciones si las hay
+                if recomendaciones and len(recomendaciones) > 0:
+                    mostrar_recomendaciones(recomendaciones, roi_target)
+                else:
+                    st.info("📭 No hay picks con valor para gestionar capital")
+                    recomendaciones = []  # Asegurar lista vacía
+                    
+            else:
+                st.info("📭 No hay picks con valor para gestionar capital")
+                recomendaciones = []  # Asegurar lista vacía
+                
+        except Exception as e:
+            st.error(f"❌ Error en Fase 4: {str(e)}")
+            st.info("Continuando con Fase 5 sin recomendaciones...")
+            recomendaciones = []  # Asegurar lista vacía en caso de error
+    
+        # 🔴🔴🔴 GUARDAR PARA FASE 5 🔴🔴🔴
+        st.session_state['recomendaciones_fase4'] = recomendaciones
         
         with st.spinner("📊 GENERANDO REPORTE FINAL..."):
             st.subheader("🎯 FASE 5: REPORTE DE RIESGO Y PERFORMANCE")
