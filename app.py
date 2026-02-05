@@ -2073,8 +2073,15 @@ elif menu == "🏠 App Principal":
             # 🔴🔴🔴 OBTENER RECOMENDACIONES DE SESSION_STATE 🔴🔴🔴
             recomendaciones = st.session_state.get('recomendaciones_fase4', [])
             
+            # Inicializar variables
+            ev_promedio = 0
+            sharpe_promedio = 0
+            cvar_promedio = 0
+            prob_profit_promedio = 0
+            objetivos_cumplidos = []
+            
             # Calcular métricas agregadas
-            if 'recomendaciones' in locals() and recomendaciones:
+            if recomendaciones:  # Cambié esto - verifica directamente la lista
                 try:
                     # Convertir todos los valores EV a float
                     ev_valores = []
@@ -2106,28 +2113,16 @@ elif menu == "🏠 App Principal":
                         if sharpe_promedio >= sharpe_min:
                             objetivos_cumplidos.append("Sharpe")
                     else:
-                        ev_promedio = 0
-                        sharpe_promedio = 0
-                        cvar_promedio = 0
-                        prob_profit_promedio = 0
-                        objetivos_cumplidos = []
+                        st.info("No se pudieron calcular métricas de EV")
                         
                 except Exception as e:
                     st.error(f"❌ Error calculando métricas: {str(e)}")
-                    ev_promedio = 0
-                    sharpe_promedio = 0
-                    cvar_promedio = 0
-                    prob_profit_promedio = 0
-                    objetivos_cumplidos = []
             else:
                 st.info("📭 No hay recomendaciones disponibles para calcular métricas")
-                ev_promedio = 0
-                sharpe_promedio = 0
-                cvar_promedio = 0
-                prob_profit_promedio = 0
-                objetivos_cumplidos = []
-                
-                col_obj1, col_obj2, col_obj3, col_obj4 = st.columns(4)
+            
+            # 🔴🔴🔴 CORRECCIÓN: CREAR COLUMNAS FUERA DEL IF/ELSE 🔴🔴🔴
+            # Esto asegura que las columnas siempre existan
+            col_obj1, col_obj2, col_obj3, col_obj4 = st.columns(4)
 
             with col_obj1:
                 color_text = "🟢" if ev_promedio * 100 >= roi_target * 0.8 else "🟠"
@@ -2145,27 +2140,36 @@ elif menu == "🏠 App Principal":
                 st.caption(f"Mín: {sharpe_min}")
 
             with col_obj4:
-                    st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
-            with col_obj4:
-                    st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
-                
+                st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
+                st.caption("Probabilidad de ganar")
+            
+            # 🔴🔴🔴 CORRECCIÓN: Eliminé el with col_obj4 duplicado 🔴🔴🔴
+            
             # Resumen de objetivos
             if len(objetivos_cumplidos) >= 2:
-                    st.success(f"✅ **SISTEMA DENTRO DE PARÁMETROS:** {', '.join(objetivos_cumplidos)}")
+                st.success(f"✅ **SISTEMA DENTRO DE PARÁMETROS:** {', '.join(objetivos_cumplidos)}")
             else:
-                    st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
+                st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
             
-            # Guardar en historial
-            if picks_con_valor:
+            # Guardar en historial (OPCIONAL - si quieres mantenerlo)
+            # Asegúrate de que picks_con_valor, team_h, team_a y logger existan
+            if 'picks_con_valor' in st.session_state and st.session_state.picks_con_valor:
+                picks_con_valor = st.session_state.picks_con_valor
+                # Verifica que team_h y team_a estén definidos
+                team_h = st.session_state.get('team_h', 'Desconocido')
+                team_a = st.session_state.get('team_a', 'Desconocido')
+                
                 for pick in picks_con_valor:
-                    logger.registrar_pick({
-                        'equipo_local': team_h,
-                        'equipo_visitante': team_a,
-                        'resultado': pick['Resultado'],
-                        'ev': pick['EV'],
-                        'prob_modelo': pick['Prob Modelo'],
-                        'cuota': pick['Cuota Mercado']
-                    })
+                    # Verifica que logger exista
+                    if 'logger' in locals() or 'logger' in globals():
+                        logger.registrar_pick({
+                            'equipo_local': team_h,
+                            'equipo_visitante': team_a,
+                            'resultado': pick.get('Resultado', 'N/A'),
+                            'ev': pick.get('EV', '0%'),
+                            'prob_modelo': pick.get('Prob Modelo', '0%'),
+                            'cuota': pick.get('Cuota Mercado', 0)
+                        })
             
             st.markdown("---")
             st.markdown("""
@@ -2182,58 +2186,58 @@ elif menu == "🏠 App Principal":
             **DRAWDOWN MÁXIMO ESPERADO**: 15-25%
             """)
 
-    # ============ PANEL DE MONITOREO EN TIEMPO REAL ============
-    st.sidebar.markdown("---")
-    st.sidebar.header("📊 MONITOREO")
+        # ============ PANEL DE MONITOREO EN TIEMPO REAL ============
+        st.sidebar.markdown("---")
+        st.sidebar.header("📊 MONITOREO")
 
-    if st.sidebar.button("📈 VER MÉTRICAS DEL SISTEMA", type="secondary"):
-        st.subheader("📊 MÉTRICAS HISTÓRICAS DEL SISTEMA")
-        
-        if logger.historial:
-            df_historial = pd.DataFrame(logger.historial)
+        if st.sidebar.button("📈 VER MÉTRICAS DEL SISTEMA", type="secondary"):
+            st.subheader("📊 MÉTRICAS HISTÓRICAS DEL SISTEMA")
             
-            col_met1, col_met2, col_met3, col_met4 = st.columns(4)
-            
-            with col_met1:
-                st.metric("Total Picks", len(df_historial))
-            
-            with col_met2:
-                picks_ev_pos = len(df_historial[df_historial['ev'] > 0])
-                st.metric("Picks EV+", picks_ev_pos)
-            
-            with col_met3:
-                if len(df_historial) > 0:
-                    ev_promedio = df_historial['ev'].mean()
-                    st.metric("EV Promedio", f"{ev_promedio:.2%}")
-            
-            with col_met4:
-                if picks_ev_pos > 0:
-                    st.metric("Ratio EV+", f"{(picks_ev_pos/len(df_historial)):.1%}")
-            
-            # Gráfico de EV histórico
-            if len(df_historial) > 1:
-                df_historial = df_historial.sort_values('timestamp')
-                df_historial['ev_acumulado'] = df_historial['ev'].cumsum()
+            if logger.historial:
+                df_historial = pd.DataFrame(logger.historial)
                 
-                fig_ev = go.Figure()
-                fig_ev.add_trace(go.Scatter(
-                    x=df_historial['timestamp'],
-                    y=df_historial['ev_acumulado']*100,
-                    mode='lines+markers',
-                    name='EV Acumulado',
-                    line=dict(color='#00CC96', width=2)
-                ))
+                col_met1, col_met2, col_met3, col_met4 = st.columns(4)
                 
-                fig_ev.update_layout(
-                    title="EV Acumulado del Sistema",
-                    xaxis_title="Fecha",
-                    yaxis_title="EV Acumulado (%)",
-                    hovermode="x unified"
-                )
+                with col_met1:
+                    st.metric("Total Picks", len(df_historial))
                 
-                st.plotly_chart(fig_ev, use_container_width=True)
-        else:
-            st.info("No hay historial registrado. Ejecuta análisis para comenzar.")
+                with col_met2:
+                    picks_ev_pos = len(df_historial[df_historial['ev'] > 0])
+                    st.metric("Picks EV+", picks_ev_pos)
+                
+                with col_met3:
+                    if len(df_historial) > 0:
+                        ev_promedio = df_historial['ev'].mean()
+                        st.metric("EV Promedio", f"{ev_promedio:.2%}")
+                
+                with col_met4:
+                    if picks_ev_pos > 0:
+                        st.metric("Ratio EV+", f"{(picks_ev_pos/len(df_historial)):.1%}")
+                
+                # Gráfico de EV histórico
+                if len(df_historial) > 1:
+                    df_historial = df_historial.sort_values('timestamp')
+                    df_historial['ev_acumulado'] = df_historial['ev'].cumsum()
+                    
+                    fig_ev = go.Figure()
+                    fig_ev.add_trace(go.Scatter(
+                        x=df_historial['timestamp'],
+                        y=df_historial['ev_acumulado']*100,
+                        mode='lines+markers',
+                        name='EV Acumulado',
+                        line=dict(color='#00CC96', width=2)
+                    ))
+                    
+                    fig_ev.update_layout(
+                        title="EV Acumulado del Sistema",
+                        xaxis_title="Fecha",
+                        yaxis_title="EV Acumulado (%)",
+                        hovermode="x unified"
+                    )
+                    
+                    st.plotly_chart(fig_ev, use_container_width=True)
+            else:
+                st.info("No hay historial registrado. Ejecuta análisis para comenzar.")
 
     # ============ SECCIÓN DE DOCUMENTACIÓN ============
     with st.expander("📚 DOCUMENTACIÓN TÉCNICA", expanded=False):
