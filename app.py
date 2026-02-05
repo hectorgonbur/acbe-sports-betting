@@ -591,10 +591,10 @@ elif menu == "🏠 App Principal":
             # Ajuste 2: CVaR dinámico
             cvar_actual = metrics.get("cvar_estimado", self.cvar_target)
             if cvar_actual <= self.cvar_target:
-            adj_cvar = 1.0  # Si el riesgo es menor que el objetivo, no penalizar
+                adj_cvar = 1.0  # Si el riesgo es menor que el objetivo, no penalizar
             else:
-            # Penalizar proporcionalmente cuando excede el objetivo
-            adj_cvar = max(0.1, self.cvar_target / cvar_actual)  # Mínimo 10%
+                # Penalizar proporcionalmente cuando excede el objetivo
+                adj_cvar = max(0.1, self.cvar_target / cvar_actual)  # Mínimo 10%
             
             # Ajuste 3: Entropía de la liga
             entropia = metrics.get("entropia", 0.5)
