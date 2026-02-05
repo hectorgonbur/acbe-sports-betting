@@ -1832,7 +1832,9 @@ elif menu == "🏠 App Principal":
             bankroll = 1000  # Se puede hacer configurable
                    
             # Ejecutar fase 4
-            try:
+        try:
+            # Primero verificamos si hay picks con valor
+            if picks_con_valor and len(picks_con_valor) > 0:
                 recomendaciones = ejecutar_fase_4(
                     picks_con_valor, 
                     gestor_riesgo, 
@@ -1840,20 +1842,25 @@ elif menu == "🏠 App Principal":
                     bankroll,
                     posterior_local,
                     posterior_visitante,
-                    entropia_auto,
+                    entropia_auto,  # Ahora coincide con el parámetro de la función
                     roi_target
                 )
                 
-                # Mostrar recomendaciones
-                mostrar_recomendaciones(recomendaciones, roi_target)
+                # Mostrar recomendaciones si las hay
+                if recomendaciones and len(recomendaciones) > 0:
+                    mostrar_recomendaciones(recomendaciones, roi_target)
+                else:
+                    st.info("📭 No hay picks con valor para gestionar capital")
+                    recomendaciones = []  # Asegurar lista vacía
+                    
+            else:
+                st.info("📭 No hay picks con valor para gestionar capital")
+                recomendaciones = []  # Asegurar lista vacía
                 
-            except Exception as e:
-                st.error(f"❌ Error en Fase 4: {str(e)}")
-                st.info("Continuando con Fase 5 sin recomendaciones...")
-        else:
-            st.info("📭 No hay picks con valor para gestionar capital")
-            
-        recomendaciones = []  # Asegurar lista vacía
+        except Exception as e:
+            st.error(f"❌ Error en Fase 4: {str(e)}")
+            st.info("Continuando con Fase 5 sin recomendaciones...")
+            recomendaciones = []  # Asegurar lista vacía en caso de error
     
         # 🔴🔴🔴 GUARDAR PARA FASE 5 🔴🔴🔴
         st.session_state['recomendaciones_fase4'] = recomendaciones
