@@ -366,6 +366,20 @@ elif menu == "🏠 App Principal":
     import plotly.graph_objects as go
     from datetime import datetime, timedelta
     
+    # ============ FUNCIÓN PARA CONVERTIR NUMPY ============
+    def convertir_datos_python(datos):
+        """Convierte todos los datos numpy a tipos nativos de Python"""
+        if isinstance(datos, np.generic):
+            return datos.item()  # Convierte numpy scalar a Python scalar
+        elif isinstance(datos, dict):
+            return {k: convertir_datos_python(v) for k, v in datos.items()}
+        elif isinstance(datos, list):
+            return [convertir_datos_python(item) for item in datos]
+        elif isinstance(datos, np.ndarray):
+            return datos.tolist()
+        else:
+            return datos
+    
     # ============ CONFIGURACIÓN AVANZADA ============
     st.title("🏛️ Sistema ACBE-Kelly v3.0 (Bayesiano Completo)")
     st.markdown("---")
@@ -1180,6 +1194,9 @@ elif menu == "🏠 App Principal":
         """
         Módulo completo para añadir a tu app actual
         """
+        # Crear un ID único para esta ejecución
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
         
         # Inicializar componentes
         recomendador = RecomendadorInteligente()
@@ -1280,54 +1297,58 @@ elif menu == "🏠 App Principal":
                         st.metric("Value Score", pick_data['Value Score'])
                     st.metric("Significativo", pick_data.get('Significativo', 'N/A'))
         
-        # Sección de exportación
+        # Sección de exportación - CAMBIA TODAS LAS KEYS:
         st.markdown("---")
         st.header("📥 EXPORTAR ANÁLISIS")
         
         col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
         
         with col_exp1:
-            if st.button("CSV", use_container_width=True, key="csv_button_export_principal"):
+            if st.button("💾 CSV", use_container_width=True, key=f"csv_btn_{unique_id}"):
                 csv_data = exportador.exportar_csv(resultados_analisis, recomendacion['metadata'])
                 st.download_button(
                     label="Descargar CSV",
                     data=csv_data,
                     file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"csv_dl_{unique_id}"
                 )
         
         with col_exp2:
-            if st.button("📄 JSON", use_container_width=True):
+            if st.button("📄 JSON", use_container_width=True, key=f"json_btn_{unique_id}"):
                 json_data = exportador.exportar_json(resultados_analisis, recomendacion['metadata'])
                 st.download_button(
                     label="Descargar JSON",
                     data=json_data,
                     file_name=f"acbe_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                     mime="application/json",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"json_btn_{unique_id}"
                 )
         
         with col_exp3:
-            if st.button("📊 PDF", use_container_width=True):
+            if st.button("📊 PDF", use_container_width=True, key=f"pdf_btn_{unique_id}"):
                 pdf_buffer = exportador.exportar_pdf(recomendacion, resultados_analisis, analisis_completo)
                 st.download_button(
                     label="Descargar PDF",
                     data=pdf_buffer,
                     file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                     mime="application/pdf",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"pdf_btn_{unique_id}"
                 )
         
         with col_exp4:
-            if st.button("🌐 HTML", use_container_width=True):
+            if st.button("🌐 HTML", use_container_width=True, key=f"html_btn_{unique_id}"):
                 html_data = exportador.exportar_resumen_html(recomendacion, resultados_analisis)
                 st.download_button(
                     label="Descargar HTML",
                     data=html_data,
                     file_name=f"acbe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
                     mime="text/html",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"html_btn_{unique_id}"
                 )
         
         # Vista previa del reporte
@@ -1349,7 +1370,7 @@ elif menu == "🏠 App Principal":
                 st.info("No hay recomendación de apuesta para este análisis.")
         
         # Guardar en historial interno
-        if st.button("📝 Guardar en Historial Interno", use_container_width=True):
+            if st.button("📝 Guardar en Historial Interno", use_container_width=True, key=f"save_hist_{unique_id}"):
             if 'historial' not in st.session_state:
                 st.session_state.historial = []
             
@@ -1727,19 +1748,27 @@ elif menu == "🏠 App Principal":
                 # Cuota justa
                 fair_odd = 1 / p_modelo if p_modelo > 0 else 999
                 
+                # Convertir valores numpy a Python nativo
                 resultados_analisis.append({
                     "Resultado": label,
-                    "Prob Modelo": p_modelo,
-                    "Prob Mercado": p_mercado,
-                    "Delta": p_modelo - p_mercado,
-                    "EV": ev,
-                    "Fair Odd": fair_odd,
-                    "Cuota Mercado": cuota,
-                    "Value Score": value_analysis,
-                    "KL Divergence": kl_analysis
+                    "Prob Modelo": float(p_modelo),  # CONVERTIR a float
+                    "Prob Mercado": float(p_mercado),
+                    "Delta": float(p_modelo - p_mercado),
+                    "EV": float(ev),  # CONVERTIR a float
+                    "Fair Odd": float(fair_odd),
+                    "Cuota Mercado": float(cuota),
+                    "Value Score": {
+                        "t_statistic": float(value_analysis.get("t_statistic", 0)),
+                        "significativo": bool(value_analysis.get("significativo", False))
+                    },
+                    "KL Divergence": {
+                        "informacion_bits": float(kl_analysis.get("informacion_bits", 0))
+                    }
                 })
-                # ============ QUITAMOS EL GUARDADO DE SESSION_STATE DE AQUÍ ============
-            
+                
+            # Convertir TODOS los datos numpy
+            resultados_analisis = convertir_datos_python(resultados_analisis)
+                
             # ============ AQUÍ MOVEMOS EL GUARDADO (FUERA DEL LOOP) ============
             # Ahora guardamos en session_state UNA SOLA VEZ, después del loop
             st.session_state['resultados_analisis'] = resultados_analisis
@@ -1777,33 +1806,17 @@ elif menu == "🏠 App Principal":
             ])
             
             st.dataframe(df_resultados, use_container_width=True)
-
-            # Mostrar recomendación y opciones de exportación
-            agregar_modulo_recomendacion()
             
             # Identificar picks con valor
             picks_con_valor = []
             for r in resultados_analisis:
                 try:
-                    ev_val = float(r['EV'].strip('%')) / 100 if '%' in r['EV'] else float(r['EV'])
-                    if r['Significativo'] == "✅" and ev_val > 0.02:
+                    ev_val = float(r['EV'])  # Ya es float, no string
+                    if r['Value Score']['significativo'] and ev_val > 0.02:
                         picks_con_valor.append(r)
                 except Exception as e:
                     st.warning(f"Error procesando pick {r.get('Resultado', 'N/A')}: {e}")
-                    
-             # =============================================
-            # GUARDAR TAMBIÉN RESULTADOS_ANALISIS Y ANÁLISIS_COMPLETO
-            # =============================================
-            st.session_state['resultados_analisis'] = resultados_analisis
-            st.session_state['analisis_completo'] = {
-                'team_h': team_h,
-                'team_a': team_a,
-                'liga': liga,
-                'or_val': or_val,
-                'entropia': entropia_auto,
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            
+                                
             # =============================================
             # 🔴🔴🔴 AQUÍ VA LA LÍNEA QUE PREGUNTAS 🔴🔴🔴
             # =============================================
@@ -1814,9 +1827,10 @@ elif menu == "🏠 App Principal":
             else:
                 st.warning("⚠️ MERCADO EFICIENTE: No se detectan ineficiencias significativas")
             
-            # 4. FINALMENTE llamar a agregar_modulo_recomendacion()
-            agregar_modulo_recomendacion()
-            
+            if 'recomendacion_ejecutada' not in st.session_state:
+                agregar_modulo_recomendacion()
+                st.session_state['recomendacion_ejecutada'] = True
+                
         with st.spinner("💰 CALCULANDO GESTIÓN DE CAPITAL..."):
             st.subheader("🎯 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
             
@@ -1976,6 +1990,8 @@ elif menu == "🏠 App Principal":
                     continue
             
             return recomendaciones
+        
+            picks_con_valor = convertir_datos_python(picks_con_valor)
 
         def mostrar_recomendaciones(recomendaciones, roi_target=12):
             """
