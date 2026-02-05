@@ -2048,7 +2048,7 @@ elif menu == "🏠 App Principal":
             st.subheader("🎯 FASE 5: REPORTE DE RIESGO Y PERFORMANCE")
             
             # 🔴🔴🔴 OBTENER RECOMENDACIONES DE SESSION_STATE 🔴🔴🔴
-             recomendaciones = st.session_state.get('recomendaciones_fase4', [])
+            recomendaciones = st.session_state.get('recomendaciones_fase4', [])
             
             # Calcular métricas agregadas
             if 'recomendaciones' in locals() and recomendaciones:
