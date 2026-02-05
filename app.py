@@ -1776,7 +1776,7 @@ elif menu == "🏠 App Principal":
                     "entropia": entropia_mercado,
                     "sharpe_esperado": simulacion_cvar["sharpe_simulado"],
                     "prob_modelo": r["Prob Modelo"],
-                    "valor_estadistico": r["Value Score"].get("t_statistic", 0)
+                    "valor_estadistico": r["Value Score"].get("t_statistic", 0),
                     "ev": ev_numerico,  # Usar el valor numérico  # Este es el EV que calculaste antes
                     "significativo": significativo  # <-- Ahora tiene valor por defecto
                 }
