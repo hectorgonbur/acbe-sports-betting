@@ -1371,15 +1371,15 @@ elif menu == "🏠 App Principal":
         
         # Guardar en historial interno
             if st.button("📝 Guardar en Historial Interno", use_container_width=True, key=f"save_hist_{unique_id}"):
-            if 'historial' not in st.session_state:
-                st.session_state.historial = []
-            
-            registro = {
-                'timestamp': datetime.now(),
-                'recomendacion': recomendacion,
-                'resultados': resultados_analisis,
-                'metadata': analisis_completo
-            }
+                if 'historial' not in st.session_state:
+                    st.session_state.historial = []
+                
+                registro = {
+                    'timestamp': datetime.now(),
+                    'recomendacion': recomendacion,
+                    'resultados': resultados_analisis,
+                    'metadata': analisis_completo
+                }
             
             st.session_state.historial.append(registro)
             st.success(f"✅ Análisis guardado. Total en historial: {len(st.session_state.historial)}")
