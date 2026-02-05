@@ -659,7 +659,7 @@ elif menu == "🏠 App Principal":
                 "esperanza": ganancias.mean(),
                 "desviacion": ganancias.std(),
                 "sharpe_simulado": ganancias.mean() / max(ganancias.std(), 0.01),
-                "max_perdida_simulada": ganancias.min()
+                "max_perdida_simulada": ganancias.min(),
                 "prob_perdida": np.mean(ganancias < 0)  # Nueva métrica importante
             }
 
