@@ -569,14 +569,32 @@ elif menu == "🏠 App Principal":
             
             # Kelly base
             kelly_base = (prob * b - (1 - prob)) / b
-            
+
+            # Asegurar que Kelly ajustado no sea negativo
+            kelly_ajustado = max(kelly_ajustado, 0)
+
+            # Además, verificar condiciones mínimas para apostar
+            condiciones_minimas = (
+                prob > 0.35,                     # Probabilidad mínima
+                cuota > 1.5,                     # Cuota mínima
+                ev > 0.02,                       # EV mínimo
+                r.get('Value Score', {}).get('significativo', False)  # Significativo estadístico
+            )
+
+            if not all(condiciones_minimas):
+                kelly_ajustado = 0
+
             # Ajuste 1: Incertidumbre del modelo
             incertidumbre = metrics.get("incertidumbre", 0.5)
             adj_incertidumbre = 1 / (1 + 2 * incertidumbre)
             
             # Ajuste 2: CVaR dinámico
             cvar_actual = metrics.get("cvar_estimado", self.cvar_target)
-            adj_cvar = 1 - (cvar_actual / self.cvar_target)
+            if cvar_actual <= self.cvar_target:
+            adj_cvar = 1.0  # Si el riesgo es menor que el objetivo, no penalizar
+            else:
+            # Penalizar proporcionalmente cuando excede el objetivo
+            adj_cvar = max(0.1, self.cvar_target / cvar_actual)  # Mínimo 10%
             
             # Ajuste 3: Entropía de la liga
             entropia = metrics.get("entropia", 0.5)
@@ -589,6 +607,9 @@ elif menu == "🏠 App Principal":
             # Kelly ajustado
             kelly_ajustado = kelly_base * adj_incertidumbre * adj_cvar * adj_entropia * adj_sharpe
             
+            # Asegurar que Kelly ajustado no sea negativo (segunda capa de protección)
+            kelly_ajustado = max(kelly_ajustado, 0)
+
             # Half-Kelly conservador
             kelly_final = kelly_ajustado * 0.5
             
@@ -629,6 +650,9 @@ elif menu == "🏠 App Principal":
             var_level = np.percentile(ganancias, (1 - conf_level) * 100)
             cvar = ganancias[ganancias <= var_level].mean()
             
+            # NUNCA devolver CVaR negativo (esto causaba el 100%)
+            cvar_abs = abs(cvar) if cvar < 0 else 0
+
             return {
                 "cvar": abs(cvar) if cvar < 0 else 0,
                 "var": abs(var_level) if var_level < 0 else 0,
@@ -636,6 +660,7 @@ elif menu == "🏠 App Principal":
                 "desviacion": ganancias.std(),
                 "sharpe_simulado": ganancias.mean() / max(ganancias.std(), 0.01),
                 "max_perdida_simulada": ganancias.min()
+                "prob_perdida": np.mean(ganancias < 0)  # Nueva métrica importante
             }
 
     class BacktestSintetico:
@@ -1117,7 +1142,7 @@ elif menu == "🏠 App Principal":
         # - analisis_completo (dict con metadata del análisis)
         
         # Esto es un ejemplo - debes adaptar a tus variables reales
-        resultados_analisis = st.session_state.get('resultados', [])
+        resultados_analisis = st.session_state.get('resultados_analisis', [])
         analisis_completo = st.session_state.get('analisis_completo', {})
         
         if not resultados_analisis:
@@ -1731,12 +1756,29 @@ elif menu == "🏠 App Principal":
                     conf_level=0.95
                 )
                 
+                # --- AQUÍ VA LA CONVERSIÓN DE EV A NUMÉRICO ---
+                # Asegurar que EV sea numérico (puede venir como string con %)
+                if isinstance(r["EV"], str) and '%' in r["EV"]:
+                    ev_numerico = float(r["EV"].strip('%')) / 100
+                else:
+                    ev_numerico = float(r["EV"])
+
+                # También verificar que Value Score tiene la clave 'significativo'
+                significativo = r.get("Value Score", {}).get("significativo", False)
+
+
                 # Calcular Kelly dinámico
                 metrics_kelly = {
-                    "incertidumbre": r["Value Score"]["p_value"],  # Usar p-value como proxy
+                    "incertidumbre": posterior_local.get("incertidumbre", 0.5) 
+                                    if r["Resultado"] == "1" 
+                                    else posterior_visitante.get("incertidumbre", 0.5),
                     "cvar_estimado": simulacion_cvar["cvar"],
                     "entropia": entropia_mercado,
-                    "sharpe_esperado": simulacion_cvar["sharpe_simulado"]
+                    "sharpe_esperado": simulacion_cvar["sharpe_simulado"],
+                    "prob_modelo": r["Prob Modelo"],
+                    "valor_estadistico": r["Value Score"].get("t_statistic", 0)
+                    "ev": ev_numerico,  # Usar el valor numérico  # Este es el EV que calculaste antes
+                    "significativo": significativo  # <-- Ahora tiene valor por defecto
                 }
                 
                 kelly_result = gestor_riesgo.calcular_kelly_dinamico(
