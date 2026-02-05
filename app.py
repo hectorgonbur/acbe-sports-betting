@@ -705,16 +705,16 @@ elif menu == "🏠 App Principal":
                 }
 
             except Exception as e:
-            return {
-                "cvar": 1.0,
-                "var": 1.0,
-                "esperanza": -1,
-                "desviacion": 0,
-                "sharpe_simulado": 0,
-                "max_perdida_simulada": -1,
-                "prob_perdida": 1.0,
-                "error": str(e)
-            }
+                return {
+                    "cvar": 1.0,
+                    "var": 1.0,
+                    "esperanza": -1,
+                    "desviacion": 0,
+                    "sharpe_simulado": 0,
+                    "max_perdida_simulada": -1,
+                    "prob_perdida": 1.0,
+                    "error": str(e)
+                }
 
     class BacktestSintetico:
         """
