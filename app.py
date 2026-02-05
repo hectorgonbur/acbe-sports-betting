@@ -366,6 +366,64 @@ elif menu == "🏠 App Principal":
     import plotly.graph_objects as go
     from datetime import datetime, timedelta
     
+    # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
+
+    def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, detalle=""):
+        """
+        Actualiza el bankroll según el resultado de una apuesta
+        
+        Args:
+            resultado_apuesta: "ganada", "perdida", "empatada"
+            monto_apostado: Cantidad apostada en €
+            cuota: Cuota de la apuesta (solo para ganadas)
+            detalle: Descripción de la operación
+        """
+        import streamlit as st
+        from datetime import datetime
+        
+        # Asegurar que existe bankroll_actual
+        if 'bankroll_actual' not in st.session_state:
+            st.session_state.bankroll_actual = 1000.0
+        
+        # Asegurar que existe historial_bankroll
+        if 'historial_bankroll' not in st.session_state:
+            st.session_state.historial_bankroll = []
+        
+        # Calcular resultado
+        if resultado_apuesta == "ganada" and cuota:
+            ganancia = monto_apostado * (cuota - 1)
+            st.session_state.bankroll_actual += ganancia
+            
+            # Registrar en historial
+            registro = {
+                'timestamp': datetime.now(),
+                'operacion': 'apuesta_ganada',
+                'monto': ganancia,
+                'detalle': f"{detalle} @ {cuota:.2f}",
+                'bankroll_final': st.session_state.bankroll_actual
+            }
+            st.session_state.historial_bankroll.append(registro)
+            
+            return ganancia
+            
+        elif resultado_apuesta == "perdida":
+            st.session_state.bankroll_actual -= monto_apostado
+            
+            # Registrar en historial
+            registro = {
+                'timestamp': datetime.now(),
+                'operacion': 'apuesta_perdida',
+                'monto': -monto_apostado,
+                'detalle': detalle,
+                'bankroll_final': st.session_state.bankroll_actual
+            }
+            st.session_state.historial_bankroll.append(registro)
+            
+            return -monto_apostado
+            
+        else:  # empatada
+            return 0
+    
     # ============ FUNCIÓN PARA CONVERTIR NUMPY ============
     def convertir_datos_python(datos):
         """Convierte todos los datos numpy a tipos nativos de Python"""
@@ -1460,6 +1518,38 @@ elif menu == "🏠 App Principal":
         st.markdown("**Actualización Bayesiana:**")
         peso_reciente = st.slider("Peso Partidos Recientes", 0.0, 1.0, 0.7)
         peso_historico = 1 - peso_reciente
+        
+    # ============ GESTIÓN DE BANKROLL ============
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("💰 GESTIÓN DE BANKROLL")
+
+    # Input para el bankroll inicial
+    bankroll_inicial = st.sidebar.number_input(
+        "Bankroll Inicial (€)",
+        min_value=10.0,
+        max_value=100000.0,
+        value=1000.0,
+        step=100.0,
+        key="bankroll_inicial"
+    )
+
+    # Mostrar bankroll actual (si existe)
+    if 'bankroll_actual' in st.session_state:
+        st.sidebar.metric(
+            "💵 Bankroll Actual", 
+            f"€{st.session_state.bankroll_actual:,.2f}",
+            delta=f"€{st.session_state.bankroll_actual - bankroll_inicial:,.2f}" 
+        )
+    else:
+        # Inicializar el bankroll actual
+        st.session_state.bankroll_actual = bankroll_inicial
+        st.sidebar.metric("💵 Bankroll Actual", f"€{st.session_state.bankroll_actual:,.2f}")
+
+    # Botón para resetear bankroll
+    if st.sidebar.button("🔄 Resetear Bankroll", type="secondary"):
+        st.session_state.bankroll_actual = bankroll_inicial
+        st.success("✅ Bankroll reseteado al valor inicial")
+        st.rerun()
 
     st.sidebar.header("📥 INGESTA DE DATOS")
 
@@ -2031,7 +2121,15 @@ elif menu == "🏠 App Principal":
             
             
             # Configurar bankroll
-            bankroll = 1000  # Se puede hacer configurable
+            bankroll = st.session_state.get('bankroll_actual', 1000.0)
+            
+             # Mostrar bankroll actual
+            col_bank1, col_bank2 = st.columns(2)
+            with col_bank1:
+                st.metric("💵 Bankroll Actual", f"€{bankroll:,.2f}")
+            with col_bank2:
+                # Calcular stake total recomendado
+                stake_total = 0
                    
             # Ejecutar fase 4
         try:
@@ -2041,13 +2139,21 @@ elif menu == "🏠 App Principal":
                     picks_con_valor, 
                     gestor_riesgo, 
                     backtester, 
-                    bankroll,
+                    bankroll,  # ← Usar bankroll dinámico
                     posterior_local,
                     posterior_visitante,
-                    entropia_auto,  # Ahora coincide con el parámetro de la función
+                    entropia_auto,
                     roi_target
                 )
                 
+                # 🔴🔴🔴 AGREGAR: Calcular y mostrar stake total
+                if recomendaciones:
+                    stake_total = sum([r.get('stake_abs', 0) for r in recomendaciones])
+                    st.info(f"📊 **Stake Total Recomendado:** €{stake_total:,.2f} ({stake_total/bankroll*100:.1f}% del bankroll)")
+                    
+                    # Advertencia si se apuesta mucho
+                    if stake_total > bankroll * 0.25:  # Más del 25%
+                        st.warning("⚠️ **ALERTA:** Estás apostando más del 25% de tu bankroll. Considera reducir stakes.")
                 # Mostrar recomendaciones si las hay
                 if recomendaciones and len(recomendaciones) > 0:
                     mostrar_recomendaciones(recomendaciones, roi_target)
@@ -2151,6 +2257,71 @@ elif menu == "🏠 App Principal":
             else:
                 st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
             
+            # ============ REGISTRO DE RESULTADOS DE APUESTAS ============
+            st.markdown("---")
+            st.subheader("🎰 REGISTRAR RESULTADOS DE APUESTAS")
+
+            if recomendaciones and len(recomendaciones) > 0:
+                st.info("📝 **Registra los resultados de tus apuestas para actualizar el bankroll automáticamente:**")
+                
+                for i, rec in enumerate(recomendaciones):
+                    # Solo mostrar picks con stake > 0
+                    if rec.get("stake_abs", 0) > 0:
+                        col_res1, col_res2, col_res3, col_res4 = st.columns([3, 2, 1, 1])
+                        
+                        with col_res1:
+                            st.write(f"**{rec['resultado']}**")
+                            st.caption(f"Stake: €{rec.get('stake_abs', 0):.2f} @ {rec.get('cuota_numerico', 0):.2f}")
+                        
+                        with col_res2:
+                            st.write(f"EV: {rec['ev']}")
+                        
+                        with col_res3:
+                            if st.button("✅ Ganó", key=f"win_{i}", type="primary", use_container_width=True):
+                                ganancia = actualizar_bankroll(
+                                    "ganada", 
+                                    rec.get('stake_abs', 0), 
+                                    rec.get('cuota_numerico', 2.0),
+                                    f"Apuesta {rec['resultado']}"
+                                )
+                                st.success(f"✅ +€{ganancia:.2f}")
+                                st.rerun()
+                        
+                        with col_res4:
+                            if st.button("❌ Perdió", key=f"loss_{i}", type="secondary", use_container_width=True):
+                                perdida = actualizar_bankroll(
+                                    "perdida", 
+                                    rec.get('stake_abs', 0),
+                                    detalle=f"Apuesta {rec['resultado']}"
+                                )
+                                st.error(f"❌ -€{abs(perdida):.2f}")
+                                st.rerun()
+                
+                # Mostrar bankroll actualizado
+                col_br1, col_br2, col_br3 = st.columns(3)
+                
+                with col_br1:
+                    st.metric(
+                        "💰 Bankroll Actual", 
+                        f"€{st.session_state.get('bankroll_actual', 1000):,.2f}"
+                    )
+                
+                with col_br2:
+                    cambio = st.session_state.get('bankroll_actual', 1000) - bankroll_inicial
+                    st.metric(
+                        "📈 Cambio Total", 
+                        f"€{cambio:,.2f}",
+                        delta=f"{(cambio/bankroll_inicial*100):.1f}%" if bankroll_inicial > 0 else "0%"
+                    )
+                
+                with col_br3:
+                    st.metric(
+                        "🎯 ROI Acumulado",
+                        f"{(cambio/bankroll_inicial*100):.1f}%" if bankroll_inicial > 0 else "0%"
+                    )
+            else:
+                st.info("📭 No hay recomendaciones para registrar resultados")
+    
             # Guardar en historial (OPCIONAL - si quieres mantenerlo)
             # Asegúrate de que picks_con_valor, team_h, team_a y logger existan
             if 'picks_con_valor' in st.session_state and st.session_state.picks_con_valor:
@@ -2186,6 +2357,65 @@ elif menu == "🏠 App Principal":
             **DRAWDOWN MÁXIMO ESPERADO**: 15-25%
             """)
 
+        # ============ DEPÓSITOS Y RETIROS ============
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📥 DEPÓSITOS / RETIROS")
+
+        col_dep1, col_dep2 = st.sidebar.columns(2)
+
+        with col_dep1:
+            deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0)
+            if st.sidebar.button("📥 Depositar", use_container_width=True):
+                if 'bankroll_actual' not in st.session_state:
+                    st.session_state.bankroll_actual = 1000.0
+                
+                st.session_state.bankroll_actual += deposito
+                
+                # Registrar en historial
+                if 'historial_bankroll' not in st.session_state:
+                    st.session_state.historial_bankroll = []
+                
+                from datetime import datetime
+                registro = {
+                    'timestamp': datetime.now(),
+                    'operacion': 'deposito',
+                    'monto': deposito,
+                    'detalle': "Depósito manual",
+                    'bankroll_final': st.session_state.bankroll_actual
+                }
+                st.session_state.historial_bankroll.append(registro)
+                
+                st.sidebar.success(f"✅ Depositados €{deposito:.2f}")
+                st.rerun()
+
+        with col_dep2:
+            retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0)
+            if st.sidebar.button("📤 Retirar", use_container_width=True):
+                if 'bankroll_actual' not in st.session_state:
+                    st.session_state.bankroll_actual = 1000.0
+                
+                if retiro <= st.session_state.bankroll_actual:
+                    st.session_state.bankroll_actual -= retiro
+                    
+                    # Registrar en historial
+                    if 'historial_bankroll' not in st.session_state:
+                        st.session_state.historial_bankroll = []
+                    
+                    from datetime import datetime
+                    registro = {
+                        'timestamp': datetime.now(),
+                        'operacion': 'retiro',
+                        'monto': -retiro,
+                        'detalle': "Retiro manual",
+                        'bankroll_final': st.session_state.bankroll_actual
+                    }
+                    st.session_state.historial_bankroll.append(registro)
+                    
+                    st.sidebar.success(f"✅ Retirados €{retiro:.2f}")
+                else:
+                    st.sidebar.error("❌ No tienes suficiente bankroll")
+                st.rerun()
+        
         # ============ PANEL DE MONITOREO EN TIEMPO REAL ============
         st.sidebar.markdown("---")
         st.sidebar.header("📊 MONITOREO")
