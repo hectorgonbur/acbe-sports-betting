@@ -1369,20 +1369,26 @@ elif menu == "🏠 App Principal":
             else:
                 st.info("No hay recomendación de apuesta para este análisis.")
         
+        # Para debuguear - verificar que las variables existen
+        print(f"recomendacion existe: {'recomendacion' in locals()}")
+        print(f"resultados_analisis existe: {'resultados_analisis' in locals()}")
+        print(f"analisis_completo existe: {'analisis_completo' in locals()}")
+        
         # Guardar en historial interno
-            if st.button("📝 Guardar en Historial Interno", use_container_width=True, key=f"save_hist_{unique_id}"):
-                if 'historial' not in st.session_state:
-                    st.session_state.historial = []
-                
-                registro = {
-                    'timestamp': datetime.now(),
-                    'recomendacion': recomendacion,
-                    'resultados': resultados_analisis,
-                    'metadata': analisis_completo
-                }
+        if st.button("📝 Guardar en Historial Interno", use_container_width=True, key=f"save_hist_{unique_id}"):
+            if 'historial' not in st.session_state:
+                st.session_state.historial = []
             
-            st.session_state.historial.append(registro)
-            st.success(f"✅ Análisis guardado. Total en historial: {len(st.session_state.historial)}")
+             # Crear registro con valores por defecto si las variables no existen
+            registro = {
+                'timestamp': datetime.now(),
+                'recomendacion': recomendacion if 'recomendacion' in locals() else "No disponible",
+                'resultados': resultados_analisis if 'resultados_analisis' in locals() else {},
+                'metadata': analisis_completo if 'analisis_completo' in locals() else {}
+            }
+            
+            st.session_state.historial.append(registro)  # Esto debe estar DENTRO del bloque del botón
+            st.success("✅ Recomendación guardada en el historial interno.")
         
         # Mostrar historial si existe
         if 'historial' in st.session_state and st.session_state.historial:
