@@ -1851,7 +1851,8 @@ elif menu == "🏠 App Principal":
                 st.error(f"❌ Error en Fase 4: {str(e)}")
                 st.info("Continuando con Fase 5 sin recomendaciones...")
         else:
-        st.info("📭 No hay picks con valor para gestionar capital")
+            st.info("📭 No hay picks con valor para gestionar capital")
+            
         recomendaciones = []  # Asegurar lista vacía
     
         # 🔴🔴🔴 GUARDAR PARA FASE 5 🔴🔴🔴
