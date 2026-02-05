@@ -1748,6 +1748,25 @@ elif menu == "🏠 App Principal":
             recomendaciones = []
             
             for r in picks_con_valor:
+                # --- CONVERSIÓN DE DATOS A NUMÉRICOS (PRIMERO) ---
+                # 1. Convertir EV a numérico
+                if isinstance(r["EV"], str) and '%' in r["EV"]:
+                    ev_numerico = float(r["EV"].strip('%')) / 100
+                else:
+                    ev_numerico = float(r["EV"])
+                
+                # 2. Convertir Prob Modelo a numérico
+                if isinstance(r["Prob Modelo"], str) and '%' in r["Prob Modelo"]:
+                    prob_modelo_numerico = float(r["Prob Modelo"].strip('%')) / 100
+                else:
+                    prob_modelo_numerico = float(r["Prob Modelo"])
+                
+                # 3. Obtener significancia
+                significativo = r.get("Value Score", {}).get("significativo", False)
+                
+                # 4. Convertir cuota a float
+                cuota_numerico = float(r["Cuota Mercado"])
+
                 # Simular CVaR para este pick
                 simulacion_cvar = gestor_riesgo.simular_cvar(
                     prob=r["Prob Modelo"],
@@ -1782,8 +1801,8 @@ elif menu == "🏠 App Principal":
                 }
                 
                 kelly_result = gestor_riesgo.calcular_kelly_dinamico(
-                    prob=r["Prob Modelo"],
-                    cuota=r["Cuota Mercado"],
+                    prob=prob_modelo_numerico,
+                    cuota=cuota_numerico,
                     bankroll=bankroll,
                     metrics=metrics_kelly
                 )
