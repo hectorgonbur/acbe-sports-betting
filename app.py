@@ -1784,19 +1784,78 @@ elif menu == "🏠 App Principal":
             # Identificar picks con valor
             picks_con_valor = []
             for r in resultados_analisis:
-                if r['Value Score']['significativo'] and r['EV'] > 0.02:
-                    picks_con_valor.append(r)
+                try:
+                    ev_val = float(r['EV'].strip('%')) / 100 if '%' in r['EV'] else float(r['EV'])
+                    if r['Significativo'] == "✅" and ev_val > 0.02:
+                        picks_con_valor.append(r)
+                except Exception as e:
+                    st.warning(f"Error procesando pick {r.get('Resultado', 'N/A')}: {e}")
+                    
+             # =============================================
+            # GUARDAR TAMBIÉN RESULTADOS_ANALISIS Y ANÁLISIS_COMPLETO
+            # =============================================
+            st.session_state['resultados_analisis'] = resultados_analisis
+            st.session_state['analisis_completo'] = {
+                'team_h': team_h,
+                'team_a': team_a,
+                'liga': liga,
+                'or_val': or_val,
+                'entropia': entropia_auto,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            # =============================================
+            # 🔴🔴🔴 AQUÍ VA LA LÍNEA QUE PREGUNTAS 🔴🔴🔴
+            # =============================================
+            st.session_state['picks_con_valor'] = picks_con_valor  # ← JUSTO AQUÍ
             
             if picks_con_valor:
                 st.success(f"✅ **{len(picks_con_valor)} INEFICIENCIA(S) DETECTADA(S)**")
             else:
                 st.warning("⚠️ MERCADO EFICIENTE: No se detectan ineficiencias significativas")
-        
+            
+            # 4. FINALMENTE llamar a agregar_modulo_recomendacion()
+            agregar_modulo_recomendacion()
+            
         with st.spinner("💰 CALCULANDO GESTIÓN DE CAPITAL..."):
             st.subheader("🎯 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
             
+            # Obtener picks de la Fase 3
+            picks_con_valor = st.session_state.get('picks_con_valor', [])
+            
+            if not picks_con_valor:
+                st.warning("⚠️ No hay picks con valor - Saltando Fase 4")
+        
+            recomendaciones = []
+            
             # Configurar bankroll
             bankroll = 1000  # Se puede hacer configurable
+                   
+            # Ejecutar fase 4
+            try:
+                recomendaciones = ejecutar_fase_4(
+                    picks_con_valor, 
+                    gestor_riesgo, 
+                    backtester, 
+                    bankroll,
+                    posterior_local,
+                    posterior_visitante,
+                    entropia_auto,
+                    roi_target
+                )
+                
+                # Mostrar recomendaciones
+                mostrar_recomendaciones(recomendaciones, roi_target)
+                
+            except Exception as e:
+                st.error(f"❌ Error en Fase 4: {str(e)}")
+                st.info("Continuando con Fase 5 sin recomendaciones...")
+        else:
+        st.info("📭 No hay picks con valor para gestionar capital")
+        recomendaciones = []  # Asegurar lista vacía
+    
+        # 🔴🔴🔴 GUARDAR PARA FASE 5 🔴🔴🔴
+        st.session_state['recomendaciones_fase4'] = recomendaciones
 
         def ejecutar_fase_4(picks_con_valor, gestor_riesgo, backtester, bankroll=1000, 
                     posterior_local=None, posterior_visitante=None, 
@@ -1980,21 +2039,62 @@ elif menu == "🏠 App Principal":
         with st.spinner("📊 GENERANDO REPORTE FINAL..."):
             st.subheader("🎯 FASE 5: REPORTE DE RIESGO Y PERFORMANCE")
             
+            # 🔴🔴🔴 OBTENER RECOMENDACIONES DE SESSION_STATE 🔴🔴🔴
+             recomendaciones = st.session_state.get('recomendaciones_fase4', [])
+            
             # Calcular métricas agregadas
-            if recomendaciones:
-                ev_promedio = np.mean([r['ev'] for r in recomendaciones])
-                sharpe_promedio = np.mean([r['sharpe_esperado'] for r in recomendaciones])
-                cvar_promedio = np.mean([r['cvar'] for r in recomendaciones])
-                prob_profit_promedio = np.mean([r['prob_profit'] for r in recomendaciones])
-                
-                # Verificar objetivos
+            if 'recomendaciones' in locals() and recomendaciones:
+                try:
+                    # Convertir todos los valores EV a float
+                    ev_valores = []
+                    for r in recomendaciones:
+                        try:
+                            if isinstance(r['ev'], str):
+                                # Convertir "5.2%" a 0.052
+                                ev_str = r['ev'].replace('%', '').strip()
+                                ev_valores.append(float(ev_str) / 100)
+                            else:
+                                ev_valores.append(float(r['ev']))
+                        except (ValueError, KeyError) as e:
+                            st.warning(f"Error procesando EV: {e}, usando 0")
+                            ev_valores.append(0.0)
+                    
+                    # Asegurar que tenemos valores
+                    if ev_valores:
+                        ev_promedio = np.mean(ev_valores)
+                        sharpe_promedio = np.mean([r.get('sharpe_esperado', 0) for r in recomendaciones])
+                        cvar_promedio = np.mean([r.get('cvar', 0.15) for r in recomendaciones])
+                        prob_profit_promedio = np.mean([r.get('prob_profit', 0) for r in recomendaciones])
+                        
+                        # Verificar objetivos
+                        objetivos_cumplidos = []
+                        if ev_promedio * 100 >= roi_target * 0.8:  # 80% del target
+                            objetivos_cumplidos.append("ROI")
+                        if cvar_promedio <= cvar_target/100:
+                            objetivos_cumplidos.append("CVaR")
+                        if sharpe_promedio >= sharpe_min:
+                            objetivos_cumplidos.append("Sharpe")
+                    else:
+                        ev_promedio = 0
+                        sharpe_promedio = 0
+                        cvar_promedio = 0
+                        prob_profit_promedio = 0
+                        objetivos_cumplidos = []
+                        
+                except Exception as e:
+                    st.error(f"❌ Error calculando métricas: {str(e)}")
+                    ev_promedio = 0
+                    sharpe_promedio = 0
+                    cvar_promedio = 0
+                    prob_profit_promedio = 0
+                    objetivos_cumplidos = []
+            else:
+                st.info("📭 No hay recomendaciones disponibles para calcular métricas")
+                ev_promedio = 0
+                sharpe_promedio = 0
+                cvar_promedio = 0
+                prob_profit_promedio = 0
                 objetivos_cumplidos = []
-                if ev_promedio * 100 >= roi_target * 0.8:  # 80% del target
-                    objetivos_cumplidos.append("ROI")
-                if cvar_promedio <= cvar_target/100:
-                    objetivos_cumplidos.append("CVaR")
-                if sharpe_promedio >= sharpe_min:
-                    objetivos_cumplidos.append("Sharpe")
                 
                 col_obj1, col_obj2, col_obj3, col_obj4 = st.columns(4)
 
