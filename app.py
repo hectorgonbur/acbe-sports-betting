@@ -1287,7 +1287,7 @@ elif menu == "🏠 App Principal":
         col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
         
         with col_exp1:
-            if st.button("💾 CSV", use_container_width=True):
+            if st.button("CSV", use_container_width=True, key="csv_button_export_principal"):
                 csv_data = exportador.exportar_csv(resultados_analisis, recomendacion['metadata'])
                 st.download_button(
                     label="Descargar CSV",
