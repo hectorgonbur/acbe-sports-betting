@@ -1718,17 +1718,17 @@ elif menu == "🏠 App Principal":
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider")
 
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
+    
     with col_met1:
-        with col_met1:
-            # Evitar completamente el formateo de porcentaje
-            try:
-                porcentaje = float(or_val) * 100
-                texto = f"{porcentaje:.2f}%"
-            except:
-                texto = "0.00%"
+        # Evitar completamente el formateo de porcentaje
+        try:
+            porcentaje = float(or_val) * 100
+            texto = f"{porcentaje:.2f}%"
+        except:
+            texto = "0.00%"
             
-            # Usar delta=None para evitar problemas
-            st.metric(label="Overround", value=texto, delta=None, key="or_metric_unique_123")
+        # Usar delta=None para evitar problemas
+        st.metric(label="Overround", value=texto, delta=None, key="or_metric_unique_123")   
 
     with col_met2:
         # Calcular margen de manera segura
@@ -1819,39 +1819,6 @@ elif menu == "🏠 App Principal":
             delta_a = st.slider(f"Impacto bajas {team_a}", 0.0, 0.3, 0.05, step=0.01, key="delta_a")
             motivacion_a = st.slider("Motivación", 0.5, 1.5, 0.9, step=0.05, key="mot_a")
             carga_fisica_a = st.slider("Carga física", 0.5, 1.5, 1.1, step=0.05, key="cf_a")
-
-    st.sidebar.markdown("---")
-    st.sidebar.header("📈 MÉTRICAS DE MERCADO")
-
-    # Calcular métricas de mercado
-    or_val = (1/c1 + 1/cx + 1/c2) - 1
-    
-    # === VERIFICACIÓN DE SEGURIDAD ===
-    if or_val is None:
-        or_val = 0.0
-    elif isinstance(or_val, str):
-        try:
-            or_val = float(or_val.replace('%', '')) / 100
-        except ValueError:
-            or_val = 0.0
-    # ================================
-    
-    # 🔴 DEBUG: AÑADIR AQUÍ - JUSTO ANTES DEL ERROR
-    st.sidebar.write(f"DEBUG: Tipo de or_val = {type(or_val)}, Valor = {or_val}")
-    
-    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1)
-    steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005)
-
-    col_met1, col_met2, col_met3 = st.sidebar.columns(3)
-    with col_met1:
-        st.metric("Overround", f"{or_val:.2%}", key="or_metric")
-    with col_met2:
-        # También corrige el error de formato aquí
-        margen_casa = (or_val/(1+or_val))*100
-        st.metric("Margen Casa", f"{margen_casa:.1f}%", key="margin_metric")
-    with col_met3:
-        entropia_mercado = st.sidebar.slider("Entropia (H)", 0.3, 0.9, 0.62, step=0.01)
-        st.metric("Entropia", f"{entropia_mercado:.3f}", key="entropia_metric")
 
     # ============ EJECUCIÓN DEL SISTEMA ============
     # BOTÓN PRINCIPAL CON KEY ÚNICA
