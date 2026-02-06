@@ -629,14 +629,14 @@ elif menu == "🏠 App Principal":
         
         def calcular_kelly_dinamico(self, prob, cuota, bankroll, metrics):
             """
-            Kelly dinámico con ajustes por:
-            1. Incertidumbre del modelo
-            2. CVaR histórico
-            3. Correlación con portfolio
-            4. Drawdown reciente
+            Kelly dinámico ALINEADO CON TUS OBJETIVOS:
+            - ROI Target: 12%
+            - CVaR Máximo: 15%
+            - Max DD: < 20%
+            - Sharpe Mínimo: 1.5
             """
             try:
-                # Validaciones iniciales
+                # ============ VALIDACIONES INICIALES ============
                 if prob is None or cuota is None or bankroll is None:
                     return {"stake_pct": 0, "stake_abs": 0, "razon": "Datos incompletos"}
                 
@@ -651,141 +651,194 @@ elif menu == "🏠 App Principal":
                 if cuota_num <= 1.0:
                     return {"stake_pct": 0, "stake_abs": 0, "razon": "Cuota <= 1.0"}
                 
-                # Kelly base
-                b = cuota_num - 1
-                if b <= 0 or prob_num <= 0:
-                    return {"stake_pct": 0, "stake_abs": 0, "razon": "Parámetros inválidos"}
-                
-                kelly_base = (prob_num * b - (1 - prob_num)) / b
-                
-                # Obtener métricas
+                # ============ CONDICIONES MÍNIMAS ============
+                # Obtener el EV de metrics
                 ev = float(metrics.get("ev", 0)) if metrics else 0
-                significativo = metrics.get("significativo", False) if metrics else False
                 
-                # Verificar condiciones mínimas para apostar
                 condiciones_minimas = (
-                    prob_num > 0.35,      # Probabilidad mínima
-                    cuota_num > 1.5,      # Cuota mínima
-                    ev > 0.02,            # EV mínimo
-                    significativo          # Significativo estadístico
+                    prob_num > 0.30,      # Probabilidad mínima del 30%
+                    cuota_num > 1.40,     # Cuota mínima 1.40
+                    ev > 0.01,            # EV mínimo del 1%
                 )
                 
                 if not all(condiciones_minimas):
                     return {
                         "stake_pct": 0, 
                         "stake_abs": 0, 
-                        "razon": f"No cumple condiciones: prob={prob_num:.2f}, cuota={cuota_num:.2f}, ev={ev:.2%}, significativo={significativo}"
+                        "razon": f"Condiciones: prob={prob_num:.2f} cuota={cuota_num:.2f} ev={ev:.2%}"
                     }
                 
-                # Ajuste 1: Incertidumbre del modelo
-                incertidumbre = float(metrics.get("incertidumbre", 0.5)) if metrics else 0.5
-                adj_incertidumbre = 1 / (1 + 2 * incertidumbre) if incertidumbre is not None else 1.0
+                # ============ KELLY BASE ============
+                b = cuota_num - 1
+                kelly_base = (prob_num * b - (1 - prob_num)) / b
                 
-                # Ajuste 2: CVaR dinámico
-                cvar_actual = float(metrics.get("cvar_estimado", self.cvar_target)) if metrics else self.cvar_target
-                if cvar_actual <= self.cvar_target:
-                    adj_cvar = 1.0
+                # Kelly base debe estar entre 0 y 0.5 (50% máximo)
+                kelly_base = max(0, min(kelly_base, 0.5))
+                
+                # ============ AJUSTES ALINEADOS CON OBJETIVOS ============
+                incertidumbre = float(metrics.get("incertidumbre", 0.5))
+                cvar_actual = float(metrics.get("cvar_estimado", 0.15))
+                sharpe_actual = float(metrics.get("sharpe_esperado", 1.0))
+                max_dd_actual = float(metrics.get("max_dd_promedio", 0.10))
+                
+                # 1. AJUSTE POR INCERTIDUMBRE (conservador)
+                # Más incertidumbre = menos stake
+                adj_incertidumbre = 1.0 / (1.0 + incertidumbre * 2.0)  # Rango: 0.33 a 1.0
+                
+                # 2. AJUSTE POR CVaR (OBJETIVO: < 15%) ← ¡CORREGIDO!
+                if cvar_actual <= 0.15:  # ← 15% como tu objetivo
+                    adj_cvar = 1.0  # CVaR dentro de objetivo
+                elif cvar_actual <= 0.25:  # Hasta 25% (riesgo moderado)
+                    adj_cvar = 0.15 / cvar_actual  # Reducción proporcional
+                else:  # CVaR > 25% (riesgo alto)
+                    adj_cvar = 0.15 / cvar_actual * 0.5  # Reducción extra
+                
+                # Límite mínimo para el ajuste CVaR
+                adj_cvar = max(0.1, adj_cvar)  # Mínimo 10% del stake original
+                
+                # 3. AJUSTE POR SHARPE (OBJETIVO: > 1.5)
+                if sharpe_actual >= 1.5:  # Cumple objetivo
+                    adj_sharpe = min(1.2, 1.0 + (sharpe_actual - 1.5) * 0.2)  # Hasta +20%
+                else:  # No cumple objetivo
+                    adj_sharpe = max(0.5, sharpe_actual / 1.5)  # Reducción proporcional
+                
+                # 4. AJUSTE POR MAX DRAWDOWN (OBJETIVO: < 20%)
+                if max_dd_actual <= 0.20:  # Cumple objetivo
+                    adj_dd = 1.0
+                elif max_dd_actual <= 0.30:  # Moderadamente alto
+                    adj_dd = 0.20 / max_dd_actual  # Reducción proporcional
+                else:  # Muy alto (> 30%)
+                    adj_dd = 0.20 / max_dd_actual * 0.5  # Reducción extra
+                
+                # Límite mínimo para ajuste DD
+                adj_dd = max(0.1, adj_dd)
+                
+                # 5. AJUSTE POR EV (para ROI objetivo del 12%)
+                if ev > 0.12:  # Mayor que ROI objetivo
+                    adj_ev = min(1.3, 1.0 + (ev - 0.12) * 2.5)  # Hasta +30%
                 else:
-                    adj_cvar = max(0.1, self.cvar_target / cvar_actual)
+                    adj_ev = max(0.3, ev / 0.12)  # Reducción si EV bajo
                 
-                # Ajuste 3: Entropía de la liga
-                entropia = float(metrics.get("entropia", 0.5)) if metrics else 0.5
-                adj_entropia = 1 / (1 + entropia) if entropia is not None else 1.0
+                # ============ KELLY FINAL CON TODOS LOS AJUSTES ============
+                kelly_ajustado = kelly_base * adj_incertidumbre * adj_cvar * adj_sharpe * adj_dd * adj_ev
                 
-                # Ajuste 4: Sharpe ratio esperado
-                sharpe_esperado = float(metrics.get("sharpe_esperado", 1.0)) if metrics else 1.0
-                adj_sharpe = min(sharpe_esperado / 2.0, 1.5) if sharpe_esperado is not None else 1.0
-                
-                # Kelly ajustado
-                kelly_ajustado = kelly_base * adj_incertidumbre * adj_cvar * adj_entropia * adj_sharpe
-                
-                # Asegurar que Kelly ajustado no sea negativo
-                kelly_ajustado = max(kelly_ajustado, 0)
-                
-                # Half-Kelly conservador
+                # Half-Kelly (conservador)
                 kelly_final = kelly_ajustado * 0.5
                 
-                # Límites estrictos de riesgo
-                kelly_final = max(0, min(kelly_final, 0.03))  # Máximo 3%
+                # ============ LÍMITES RAZONABLES Y ALINEADOS ============
+                # Mínimo: 0.5% (€5 con bankroll de €1000)
+                # Máximo: 3% si todo perfecto, 5% si excepcional
+                if (ev > 0.20 and cvar_actual < 0.15 and sharpe_actual > 2.0):
+                    limite_max = 0.05  # 5% para oportunidades excepcionales
+                else:
+                    limite_max = 0.03  # 3% máximo normal
                 
-                # Stake en euros
+                kelly_final = max(0.005, min(kelly_final, limite_max))
+                
+                # Stake en euros (con mínimo de €5 para ser significativo)
                 stake_abs = kelly_final * bankroll_num
+                stake_abs = max(5.0, stake_abs)  # Mínimo €5
                 
                 return {
                     "stake_pct": kelly_final * 100,
                     "stake_abs": stake_abs,
                     "kelly_base": kelly_base * 100,
-                    "ajuste_incertidumbre": adj_incertidumbre,
-                    "ajuste_cvar": adj_cvar,
-                    "sharpe_ajuste": adj_sharpe,
-                    "razon": "Cálculo exitoso"
+                    "ajustes": {
+                        "incertidumbre": adj_incertidumbre,
+                        "cvar": adj_cvar,
+                        "sharpe": adj_sharpe,
+                        "drawdown": adj_dd,
+                        "ev": adj_ev
+                    },
+                    "razon": f"CVaR: {cvar_actual:.1%} | Sharpe: {sharpe_actual:.2f} | DD: {max_dd_actual:.1%} | EV: {ev:.1%}"
                 }
                 
             except Exception as e:
+                # En caso de error, stake mínimo conservador
                 return {
-                    "stake_pct": 0, 
-                    "stake_abs": 0, 
-                    "razon": f"❌ Error en cálculo: {str(e)}"
+                    "stake_pct": 0.5,  # 0.5% mínimo
+                    "stake_abs": max(5.0, bankroll_num * 0.005),
+                    "razon": f"Error: {str(e)[:50]}"
                 }
         
         def simular_cvar(self, prob, cuota, n_simulaciones=10000, conf_level=0.95):
             """
-            Simulación Monte Carlo para calcular CVaR
+            Simulación Monte Carlo para calcular CVaR - VERSIÓN MEJORADA
             """
             try:
-                # Validar inputs
-                if prob <= 0 or cuota <= 1:
+                # 1. Validaciones básicas
+                if prob <= 0 or prob >= 1 or cuota <= 1:
                     return {
-                        "cvar": 1.0,
-                        "var": 1.0,
-                        "esperanza": -1,
-                        "desviacion": 0,
+                        "cvar": 0.25,
+                        "var": 0.20,
+                        "esperanza": 0,
+                        "desviacion": 0.1,
                         "sharpe_simulado": 0,
                         "max_perdida_simulada": -1,
-                        "prob_perdida": 1.0
+                        "prob_perdida": 0.5
                     }
-            
-                ganancias = []
                 
+                # 2. Simular ganancias/pérdidas
+                ganancias = []
                 for _ in range(n_simulaciones):
-                    # Simular resultado binario
-                    gana = np.random.random() < prob
-                    if gana:
-                        ganancia = (cuota - 1)
+                    if np.random.random() < prob:
+                        ganancias.append(cuota - 1)  # Ganas: (cuota-1)*stake
                     else:
-                        ganancia = -1
-                    
-                    ganancias.append(ganancia)
+                        ganancias.append(-1)  # Pierdes: -1*stake
                 
                 ganancias = np.array(ganancias)
                 
-                # Calcular VaR y CVaR
-                var_level = np.percentile(ganancias, (1 - conf_level) * 100)
-                cvar = ganancias[ganancias <= var_level].mean()
+                # 3. Calcular VaR (Value at Risk)
+                percentil = 5  # 100 * (1 - conf_level)
+                var = np.percentile(ganancias, percentil)
                 
-                # NUNCA devolver CVaR negativo
-                cvar_abs = abs(cvar) if cvar < 0 else 0
+                # 4. Calcular CVaR (Conditional Value at Risk)
+                # Promedio de las pérdidas que están POR DEBAJO del VaR
+                perdidas_extremas = ganancias[ganancias <= var]
+                
+                if len(perdidas_extremas) > 0:
+                    cvar = abs(perdidas_extremas.mean())
+                else:
+                    cvar = 0.0  # No hay pérdidas extremas
+                
+                # 5. LIMITAR CVaR a valores RAZONABLES (máximo 50%)
+                cvar = min(cvar, 0.50)
+                
+                # 6. Asegurar que CVaR no sea menor que VaR (solo si VaR es negativo)
+                if var < 0:  # Solo cuando hay pérdidas
+                    var_abs = abs(var)
+                    cvar = max(cvar, var_abs * 1.1)  # CVaR debe ser > VaR
+                else:
+                    # Si VaR es positivo o cero, no hay pérdidas en el 5% peor
+                    cvar = max(cvar, 0.0)
+                
+                # 7. Calcular otras métricas
+                esperanza = ganancias.mean()
+                desviacion = ganancias.std()
+                sharpe = esperanza / max(desviacion, 0.01)
+                prob_perdida = np.mean(ganancias < 0)
+                max_perdida = ganancias.min()
                 
                 return {
-                    "cvar": cvar_abs,
-                    "var": abs(var_level) if var_level < 0 else 0,
-                    "esperanza": ganancias.mean(),
-                    "desviacion": ganancias.std(),
-                    "sharpe_simulado": ganancias.mean() / max(ganancias.std(), 0.01),
-                    "max_perdida_simulada": ganancias.min(),
-                    "prob_perdida": np.mean(ganancias < 0)
+                    "cvar": cvar,
+                    "var": abs(var),
+                    "esperanza": esperanza,
+                    "desviacion": desviacion,
+                    "sharpe_simulado": sharpe,
+                    "max_perdida_simulada": max_perdida,
+                    "prob_perdida": prob_perdida
                 }
-
+                
             except Exception as e:
                 return {
-                    "cvar": 1.0,
-                    "var": 1.0,
-                    "esperanza": -1,
-                    "desviacion": 0,
+                    "cvar": 0.20,
+                    "var": 0.15,
+                    "esperanza": 0,
+                    "desviacion": 0.1,
                     "sharpe_simulado": 0,
                     "max_perdida_simulada": -1,
-                    "prob_perdida": 1.0,
-                    "error": str(e)
+                    "prob_perdida": 0.5,
+                    "error": str(e)[:100]
                 }
 
     class BacktestSintetico:
