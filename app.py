@@ -1719,9 +1719,16 @@ elif menu == "🏠 App Principal":
 
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     with col_met1:
-        # Usar la función de formateo seguro
-        valor_formateado = formatear_porcentaje_seguro(or_val)
-        st.metric("Overround", valor_formateado, key="or_metric")
+        with col_met1:
+            # Evitar completamente el formateo de porcentaje
+            try:
+                porcentaje = float(or_val) * 100
+                texto = f"{porcentaje:.2f}%"
+            except:
+                texto = "0.00%"
+            
+            # Usar delta=None para evitar problemas
+            st.metric(label="Overround", value=texto, delta=None, key="or_metric_unique_123")
 
     with col_met2:
         # Calcular margen de manera segura
