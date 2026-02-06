@@ -1666,31 +1666,79 @@ elif menu == "🏠 App Principal":
     st.sidebar.markdown("---")
     st.sidebar.header("📈 MÉTRICAS DE MERCADO")
 
-    # Calcular métricas de mercado
-    or_val = (1/c1 + 1/cx + 1/c2) - 1
-    
-    # Verificación y conversión segura
-    if or_val is None:
-        or_val = 0.0  # valor por defecto
-    elif isinstance(or_val, str):
+    # ============ CÁLCULO SEGURO DEL OVERROUND ============
+    def calcular_or_val_seguro(c1_val, cx_val, c2_val):
+        """Calcula el overround de manera segura"""
         try:
-            # Eliminar cualquier signo % y convertir a float
-            or_val = float(or_val.replace('%', '')) / 100
-        except ValueError:
-            or_val = 0.0
-    # === FIN DE LA VERIFICACIÓN ===
+            # Convertir a float explícitamente
+            c1_float = float(c1_val) if c1_val else 1.01
+            cx_float = float(cx_val) if cx_val else 1.01
+            c2_float = float(c2_val) if c2_val else 1.01
+            
+            # Evitar valores cero o negativos
+            c1_float = max(1.01, c1_float)
+            cx_float = max(1.01, cx_float)
+            c2_float = max(1.01, c2_float)
+            
+            # Calcular overround
+            resultado = (1/c1_float + 1/cx_float + 1/c2_float) - 1
+            
+            # Verificar que sea un número finito
+            import numpy as np
+            if np.isfinite(resultado):
+                return float(resultado)  # Convertir a float nativo de Python
+            else:
+                return 0.0
+        except Exception as e:
+            return 0.0
+
+    # Calcular métricas de mercado
+    or_val = calcular_or_val_seguro(c1, cx, c2)
+
+    # ============ DEBUG (opcional, para verificar) ============
+    st.sidebar.caption(f"Debug: c1={c1}, cx={cx}, c2={c2}")
+    st.sidebar.caption(f"Debug: or_val={or_val}, type={type(or_val)}")
+
+    # ============ GARANTIZAR QUE or_val SEA FLOAT ============
+    # Ya lo hace la función, pero por si acaso:
+    or_val = float(or_val) if isinstance(or_val, (int, float)) else 0.0
+
+    # ============ FUNCIÓN DE FORMATEO SEGURO ============
+    def formatear_porcentaje_seguro(valor):
+        """Formatea un valor como porcentaje de manera segura"""
+        try:
+            # Asegurar que sea float
+            valor_float = float(valor)
+            # Limitar decimales y formatear
+            return f"{valor_float:.2%}"
+        except (ValueError, TypeError):
+            return "0.00%"
 
     volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="volumen_slider")
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider")
-    
+
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     with col_met1:
-        st.metric("Overround", f"{or_val:.2%}", key="or_metric")
+        # Usar la función de formateo seguro
+        valor_formateado = formatear_porcentaje_seguro(or_val)
+        st.metric("Overround", valor_formateado, key="or_metric")
+
     with col_met2:
-        st.metric("Margen Casa", f"{(or_val/(1+or_val)*100):.1f}%", key="margen_metric")
+        # Calcular margen de manera segura
+        try:
+            if or_val != -1:  # Evitar división por cero
+                margen_casa = (or_val / (1 + or_val)) * 100
+                margen_formateado = f"{margen_casa:.1f}%"
+            else:
+                margen_formateado = "0.0%"
+        except Exception:
+            margen_formateado = "0.0%"
+        
+        st.metric("Margen Casa", margen_formateado, key="margen_metric")
+
     with col_met3:
         entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01, key="entropia_slider")
-        st.metric("Entropía", f"{entropia_mercado:.3f}", key="entropia_metric")
+        st.metric("Entropía", f"{float(entropia_mercado):.3f}", key="entropia_metric")
 
     # --- PARÁMETROS DE RIESGO ---
     st.sidebar.header("🎯 PARÁMETROS DE RIESGO")
