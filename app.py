@@ -1768,66 +1768,10 @@ elif menu == "🏠 App Principal":
     with col_met3:
         entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01)
         st.metric("Entropía", f"{entropia_mercado:.3f}")
-        
-    # ANTES de guardar en session_state, calcula o define estos valores:
-
-    # Ejemplo de cómo podrías generarlos:
-    resultados_analisis = realizar_analisis_estadistico(datos)  # Tu función de análisis
-    analisis_completo = generar_analisis_completo(resultados_analisis)
-    picks_con_valor = identificar_picks_con_valor(resultados_analisis)
-    recomendaciones = generar_recomendaciones_fase4(picks_con_valor)
-
-    # ... luego continúa con:
-    # ==================== VERIFICACIÓN ====================
-    # Coloca esto justo ANTES de crear el diccionario de datos_analisis
-
-   # Alternativa: crear una lista de variables y verificar si están asignadas
-    variables_a_verificar = {
-        'resultados_analisis': resultados_analisis,
-        'analisis_completo': analisis_completo,
-        # ... etc
-    }
-
-    for nombre, variable in variables_a_verificar.items():
-        if variable is None:  # O alguna otra condición
-            st.error(f"Error: La variable '{nombre}' no tiene un valor válido.")
-            st.stop()
-
-    # GUARDAR TODO EL ANÁLISIS EN SESSION_STATE
-    st.session_state['analisis_ejecutado'] = True
-    st.session_state['analisis_timestamp'] = datetime.now()
-    st.session_state['datos_analisis'] = {
-        'resultados_analisis': resultados_analisis,  # ✅ Ahora sí está definida
-        'analisis_completo': analisis_completo,
-        'picks_con_valor': picks_con_valor,
-        'recomendaciones_fase4': recomendaciones,
-        'team_h': team_h,
-        'team_a': team_a,
-        'liga': liga,
-        'cuotas': {'1': c1, 'X': cx, '2': c2},
-        'parametros': {
-            'roi_target': roi_target,
-            'cvar_target': cvar_target,
-            'max_dd': max_dd,
-            'sharpe_min': sharpe_min
-        }
-    }
-
-    # También guardar los datos de entrada para poder reusarlos
-    st.session_state['inputs_analisis'] = {
-        'team_h': team_h, 'team_a': team_a,
-        'g_h_ult10': g_h_ult10, 'g_a_ult10': g_a_ult10,
-        'xg_h_prom': xg_h_prom, 'xg_a_prom': xg_a_prom,
-        # ... guarda todos los inputs importantes
-    }
-
-    st.success("✅ Análisis completado y guardado en memoria")
-    st.rerun()
 
     # ============ EJECUCIÓN DEL SISTEMA ============
-    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_container_width=True):
+    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_container_width=True):  
         
-        # 1. Crear el diccionario con todos los datos recopilados
         datos = {
             'team_h': team_h,
             'team_a': team_a,
@@ -2485,9 +2429,20 @@ elif menu == "🏠 App Principal":
             else:
                 st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
             
-            # ============ GUARDAR ANÁLISIS ============
-            # Al final del bloque de "EJECUTAR ANÁLISIS COMPLETO", ANTES de cualquier st.rerun():
-            
+            # ============ VERIFICACIÓN ============
+            variables_a_verificar = {
+                'resultados_analisis': resultados_analisis,
+                'analisis_completo': analisis_completo,
+                'picks_con_valor': picks_con_valor,
+                'recomendaciones': recomendaciones,
+            }
+
+            for nombre, variable in variables_a_verificar.items():
+                if variable is None:
+                    st.error(f"Error: La variable '{nombre}' no tiene un valor válido.")
+                    st.stop()
+
+            # ============ GUARDAR TODO EN SESSION_STATE ============
             st.session_state['analisis_ejecutado'] = True
             st.session_state['analisis_timestamp'] = datetime.now()
             st.session_state['datos_analisis'] = {
@@ -2506,41 +2461,41 @@ elif menu == "🏠 App Principal":
                     'sharpe_min': sharpe_min
                 }
             }
-            
-            # También guardar los inputs para reutilizar
+
+            # También guardar los datos de entrada para poder reusarlos
             st.session_state['inputs_analisis'] = {
-                'team_h': team_h,
-                'team_a': team_a,
-                'g_h_ult5': g_h_ult5,
-                'g_h_ult10': g_h_ult10,
-                'g_a_ult5': g_a_ult5,
-                'g_a_ult10': g_a_ult10,
-                'xg_h_prom': xg_h_prom,
-                'xg_a_prom': xg_a_prom,
-                'tiros_arco_h': tiros_arco_h,
-                'tiros_arco_a': tiros_arco_a,
-                'posesion_h': posesion_h,
-                'precision_pases_h': precision_pases_h,
-                'precision_pases_a': precision_pases_a,
-                'goles_rec_h': goles_rec_h,
-                'goles_rec_a': goles_rec_a,
-                'xg_contra_h': xg_contra_h,
-                'xg_contra_a': xg_contra_a,
-                'entradas_h': entradas_h,
-                'entradas_a': entradas_a,
-                'recuperaciones_h': recuperaciones_h,
-                'recuperaciones_a': recuperaciones_a,
-                'delta_h': delta_h,
-                'delta_a': delta_a,
-                'motivacion_h': motivacion_h,
-                'motivacion_a': motivacion_a,
-                'carga_fisica_h': carga_fisica_h,
-                'carga_fisica_a': carga_fisica_a
+                'team_h': team_h, 'team_a': team_a,
+                'g_h_ult10': g_h_ult10, 'g_a_ult10': g_a_ult10,
+                'xg_h_prom': xg_h_prom, 'xg_a_prom': xg_a_prom,
+                'g_h_ult5': g_h_ult5, 'g_a_ult5': g_a_ult5,
+                'tiros_arco_h': tiros_arco_h, 'tiros_arco_a': tiros_arco_a,
+                'posesion_h': posesion_h, 'precision_pases_h': precision_pases_h,
+                'precision_pases_a': precision_pases_a, 'goles_rec_h': goles_rec_h,
+                'goles_rec_a': goles_rec_a, 'xg_contra_h': xg_contra_h,
+                'xg_contra_a': xg_contra_a, 'entradas_h': entradas_h,
+                'entradas_a': entradas_a, 'recuperaciones_h': recuperaciones_h,
+                'recuperaciones_a': recuperaciones_a, 'delta_h': delta_h,
+                'delta_a': delta_a, 'motivacion_h': motivacion_h,
+                'motivacion_a': motivacion_a, 'carga_fisica_h': carga_fisica_h,
+                'carga_fisica_a': carga_fisica_a, 'cuotas': {'1': c1, 'X': cx, '2': c2}
             }
-            
+
             st.success("✅ Análisis completado y guardado en memoria")
-            st.rerun()  # Esto es opcional, pero puede ayudar a refrescar
+            st.rerun()
     
+        # ============ DESPUÉS DEL BOTÓN PRINCIPAL ============
+        # AQUÍ VA EL CÓDIGO QUE PREGUNTAS:
+        st.sidebar.markdown("---")
+
+        if st.session_state.get('analisis_ejecutado', False):
+            if st.sidebar.button("🔄 Re-ejecutar último análisis", type="secondary"):
+                # Cargar parámetros guardados
+                inputs = st.session_state.get('inputs_analisis', {})
+                # Aquí deberías rellenar automáticamente los inputs con los valores guardados
+                st.sidebar.success("Parámetros cargados. Presiona 'EJECUTAR ANÁLISIS COMPLETO'")
+                st.session_state['cargar_ultimo_analisis'] = True
+                st.rerun()
+        
         # ============ SECCIÓN SIEMPRE VISIBLE: REGISTRO DE APUESTAS ============
         st.markdown("---")
         st.subheader("🎰 REGISTRAR RESULTADOS DE APUESTAS")
