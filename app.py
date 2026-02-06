@@ -1765,16 +1765,6 @@ elif menu == "🏠 App Principal":
             motivacion_a = st.slider("Motivación", 0.5, 1.5, 0.9, step=0.05, key="mot_a")
             carga_fisica_a = st.slider("Carga física", 0.5, 1.5, 1.1, step=0.05, key="cf_a")
 
-    # --- SECCIÓN MERCADO Y CUOTAS ---
-    st.sidebar.header("💰 MERCADO")
-    col_c1, col_c2, col_c3 = st.sidebar.columns(3)
-    with col_c1:
-        c1 = st.number_input("1", value=2.90, min_value=1.01, step=0.01, key="cuota1")
-    with col_c2:
-        cx = st.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cuotax")
-    with col_c3:
-        c2 = st.number_input("2", value=2.45, min_value=1.01, step=0.01, key="cuota2")
-
     st.sidebar.markdown("---")
     st.sidebar.header("📈 MÉTRICAS DE MERCADO")
 
@@ -1790,6 +1780,9 @@ elif menu == "🏠 App Principal":
         except ValueError:
             or_val = 0.0
     # ================================
+    
+    # 🔴 DEBUG: AÑADIR AQUÍ - JUSTO ANTES DEL ERROR
+    st.sidebar.write(f"DEBUG: Tipo de or_val = {type(or_val)}, Valor = {or_val}")
     
     volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1)
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005)
@@ -1807,9 +1800,13 @@ elif menu == "🏠 App Principal":
 
     # ============ EJECUCIÓN DEL SISTEMA ============
     # BOTÓN PRINCIPAL CON KEY ÚNICA
+    st.sidebar.markdown("---")
     if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", 
                         use_container_width=True, key="ejecutar_analisis_btn"):  
         
+        # 🔴 DEBUG: AÑADIR AQUÍ - VERIFICAR QUE TODO SE EJECUTA
+        st.write("DEBUG: Botón ejecutar presionado")
+    
         datos = {
             'team_h': team_h,
             'team_a': team_a,
@@ -1846,11 +1843,11 @@ elif menu == "🏠 App Principal":
             'entropia_mercado': entropia_mercado,
             'liga': liga
         }
+        # ============ INICIALIZAR COMPONENTES ============
         with st.spinner("🔬 Inicializando modelo bayesiano jerárquico..."):
-            # Inicializar componentes
             modelo_bayes = ModeloBayesianoJerarquico(liga)
             detector = DetectorIneficiencias()
-            gestor_riesgo = GestorRiscoCVaR(cvar_target=cvar_target/100, max_drawdown=max_dd/100)
+            gestor_riesgo = GestorRiscoCVaR(cvar_target=cvar_target, max_drawdown=max_dd)
             backtester = BacktestSintetico()
     
     # En la barra lateral, después del botón de ejecutar análisis:
@@ -1865,42 +1862,43 @@ elif menu == "🏠 App Principal":
             st.session_state['cargar_ultimo_analisis'] = True
             st.rerun()
             
-            # FASE 0: Validación de mercado
-            st.subheader("🎯 FASE 0: VALIDACIÓN DE MERCADO")
-            
-            col_val1, col_val2, col_val3, col_val4 = st.columns(4)
-            
-            with col_val1:
-                val_min_odd = c1 >= 1.60 and c2 >= 1.60
-                st.metric("Cuota Mínima", "✅" if val_min_odd else "❌", 
-                        delta="OK" if val_min_odd else "< 1.60")
-            
-            with col_val2:
-                val_or = or_val <= 0.07
-                st.metric("Overround", "✅" if val_or else "❌", 
-                        delta=f"{or_val:.2%}" if val_or else "Alto")
-            
-            with col_val3:
-                val_entropia = entropia_mercado <= 0.72
-                st.metric("Entropía", "✅" if val_entropia else "❌",
-                        delta=f"{entropia_mercado:.3f}")
-            
-            with col_val4:
-                val_volumen = volumen_estimado >= 0.8
-                st.metric("Liquidez", "✅" if val_volumen else "⚠️",
-                        delta=f"{volumen_estimado:.1f}x")
-            
-            # Verificar condiciones de evasión
-            condiciones_evasion = []
-            if not val_min_odd: condiciones_evasion.append("Cuota < 1.60")
-            if not val_or: condiciones_evasion.append(f"Overround alto ({or_val:.2%})")
-            if not val_entropia: condiciones_evasion.append(f"Entropía alta ({entropia_mercado:.3f})")
-            
-            if condiciones_evasion:
-                st.error(f"🚫 EVASIÓN DE RIESGO: {', '.join(condiciones_evasion)}")
-                st.stop()
-            
-            st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
+            # ============ FASE 0: VALIDACIÓN DE MERCADO ============
+            with st.spinner("🔍 Validando condiciones del mercado..."):
+                st.subheader("🎯 FASE 0: VALIDACIÓN DE MERCADO")
+                
+                col_val1, col_val2, col_val3, col_val4 = st.columns(4)
+                
+                with col_val1:
+                    val_min_odd = c1 >= 1.60 and c2 >= 1.60
+                    st.metric("Cuota Mínima", "✅" if val_min_odd else "❌", 
+                            delta="OK" if val_min_odd else "< 1.60")
+                
+                with col_val2:
+                    val_or = or_val <= 0.07
+                    st.metric("Overround", "✅" if val_or else "❌", 
+                            delta=f"{or_val:.2%}" if val_or else "Alto")
+                
+                with col_val3:
+                    val_entropia = entropia_mercado <= 0.72
+                    st.metric("Entropía", "✅" if val_entropia else "❌",
+                            delta=f"{entropia_mercado:.3f}")
+                
+                with col_val4:
+                    val_volumen = volumen_estimado >= 0.8
+                    st.metric("Liquidez", "✅" if val_volumen else "⚠️",
+                            delta=f"{volumen_estimado:.1f}x")
+                
+                # Verificar condiciones de evasión
+                condiciones_evasion = []
+                if not val_min_odd: condiciones_evasion.append("Cuota < 1.60")
+                if not val_or: condiciones_evasion.append(f"Overround alto ({or_val:.2%})")
+                if not val_entropia: condiciones_evasion.append(f"Entropía alta ({entropia_mercado:.3f})")
+                
+                if condiciones_evasion:
+                    st.error(f"🚫 EVASIÓN DE RIESGO: {', '.join(condiciones_evasion)}")
+                    st.stop()
+                
+                st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
         
         with st.spinner("🧠 EJECUTANDO INFERENCIA BAYESIANA..."):
             st.subheader("🎯 FASE 1: INFERENCIA BAYESIANA")
@@ -2321,6 +2319,9 @@ elif menu == "🏠 App Principal":
         with st.spinner("💰 CALCULANDO GESTIÓN DE CAPITAL..."):
             st.subheader("🎯 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
             
+            # 🔴 DEBUG: AÑADIR AQUÍ - VERIFICAR PICKS
+            st.write(f"DEBUG: picks_con_valor = {st.session_state.get('picks_con_valor', [])}")
+            
             # Obtener picks de la Fase 3
             picks_con_valor = st.session_state.get('picks_con_valor', [])
             
@@ -2388,6 +2389,7 @@ elif menu == "🏠 App Principal":
             
             # 🔴🔴🔴 OBTENER RECOMENDACIONES DE SESSION_STATE 🔴🔴🔴
             recomendaciones = st.session_state.get('recomendaciones_fase4', [])
+            st.write(f"DEBUG FASE 5: Recomendaciones = {recomendaciones}, Tipo = {type(recomendaciones)}")
             
             # Inicializar variables
             ev_promedio = 0
