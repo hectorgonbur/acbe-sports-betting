@@ -1732,11 +1732,35 @@ elif menu == "🏠 App Principal":
         entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01)
         st.metric("Entropía", f"{entropia_mercado:.3f}")
         
+    # ANTES de guardar en session_state, calcula o define estos valores:
+
+    # Ejemplo de cómo podrías generarlos:
+    resultados_analisis = realizar_analisis_estadistico(datos)  # Tu función de análisis
+    analisis_completo = generar_analisis_completo(resultados_analisis)
+    picks_con_valor = identificar_picks_con_valor(resultados_analisis)
+    recomendaciones = generar_recomendaciones_fase4(picks_con_valor)
+
+    # ... luego continúa con:
+    # ==================== VERIFICACIÓN ====================
+    # Coloca esto justo ANTES de crear el diccionario de datos_analisis
+
+   # Alternativa: crear una lista de variables y verificar si están asignadas
+    variables_a_verificar = {
+        'resultados_analisis': resultados_analisis,
+        'analisis_completo': analisis_completo,
+        # ... etc
+    }
+
+    for nombre, variable in variables_a_verificar.items():
+        if variable is None:  # O alguna otra condición
+            st.error(f"Error: La variable '{nombre}' no tiene un valor válido.")
+            st.stop()
+
     # GUARDAR TODO EL ANÁLISIS EN SESSION_STATE
     st.session_state['analisis_ejecutado'] = True
     st.session_state['analisis_timestamp'] = datetime.now()
     st.session_state['datos_analisis'] = {
-        'resultados_analisis': resultados_analisis,
+        'resultados_analisis': resultados_analisis,  # ✅ Ahora sí está definida
         'analisis_completo': analisis_completo,
         'picks_con_valor': picks_con_valor,
         'recomendaciones_fase4': recomendaciones,
