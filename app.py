@@ -1643,6 +1643,43 @@ elif menu == "🏠 App Principal":
     team_h = st.sidebar.text_input("Equipo Local", value="Bologna")
     team_a = st.sidebar.text_input("Equipo Visitante", value="AC Milan")
 
+    # --- SECCIÓN MERCADO Y CUOTAS ---
+    st.sidebar.header("💰 MERCADO")
+    col_c1, col_c2, col_c3 = st.sidebar.columns(3)
+    with col_c1:
+        c1 = st.number_input("1", value=2.90, min_value=1.01, step=0.01, key="cuota1")
+    with col_c2:
+        cx = st.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cuotax")
+    with col_c3:
+        c2 = st.number_input("2", value=2.45, min_value=1.01, step=0.01, key="cuota2")
+
+    st.sidebar.markdown("---")
+    st.sidebar.header("📈 MÉTRICAS DE MERCADO")
+
+    # Calcular métricas de mercado
+    or_val = (1/c1 + 1/cx + 1/c2) - 1
+    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1)
+    steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005)
+
+    col_met1, col_met2, col_met3 = st.sidebar.columns(3)
+    with col_met1:
+        st.metric("Overround", f"{or_val:.2%}")
+    with col_met2:
+        st.metric("Margen Casa", f"{(or_val/(1+or_val)*100):.1f}%")
+    with col_met3:
+        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01)
+        st.metric("Entropía", f"{entropia_mercado:.3f}")
+
+    # --- PARÁMETROS DE RIESGO ---
+    st.sidebar.header("🎯 PARÁMETROS DE RIESGO")
+    roi_target = st.sidebar.slider("ROI Target (%)", 0.0, 20.0, 10.0, step=0.5) / 100.0
+    cvar_target = st.sidebar.slider("CVaR Target (%)", 0.0, 10.0, 5.0, step=0.5) / 100.0
+    max_dd = st.sidebar.slider("Max Drawdown (%)", 0.0, 30.0, 15.0, step=0.5) / 100.0
+    sharpe_min = st.sidebar.slider("Sharpe Mínimo", 0.0, 3.0, 1.0, step=0.1)
+
+    # Selector de liga
+    liga = st.sidebar.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"])
+
     # --- PANEL PRINCIPAL: DATOS DETALLADOS ---
     st.header("📈 ANÁLISIS DE EQUIPOS")
 
@@ -1656,25 +1693,25 @@ elif menu == "🏠 App Principal":
             with col_o1:
                 g_h_ult5 = st.number_input(f"Goles (últ. 5p)", value=8, min_value=0, key="gh5")
                 xg_h_prom = st.number_input("xG promedio", value=1.65, step=0.05, key="xgh")
-                tiros_arco_h = st.number_input("Tiros a puerta/p", value=4.8, step=0.1)
+                tiros_arco_h = st.number_input("Tiros a puerta/p", value=4.8, step=0.1, key="tir_h")
             with col_o2:
                 g_h_ult10 = st.number_input(f"Goles (últ. 10p)", value=15, min_value=0, key="gh10")
                 posesion_h = st.slider("Posesión %", 30, 70, 52, key="pos_h")
-                precision_pases_h = st.slider("Precisión pases %", 70, 90, 82)
+                precision_pases_h = st.slider("Precisión pases %", 70, 90, 82, key="pp_h")
         
         with st.expander("🛡️ ESTADÍSTICAS DEFENSIVAS", expanded=False):
             col_d1, col_d2 = st.columns(2)
             with col_d1:
                 goles_rec_h = st.number_input("Goles recibidos (10p)", value=12, min_value=0, key="grh")
-                xg_contra_h = st.number_input("xG en contra/p", value=1.2, step=0.05)
+                xg_contra_h = st.number_input("xG en contra/p", value=1.2, step=0.05, key="xgch")
             with col_d2:
-                entradas_h = st.number_input("Entradas/p", value=15.5, step=0.1)
-                recuperaciones_h = st.number_input("Recuperaciones/p", value=45.0, step=0.5)
+                entradas_h = st.number_input("Entradas/p", value=15.5, step=0.1, key="ent_h")
+                recuperaciones_h = st.number_input("Recuperaciones/p", value=45.0, step=0.5, key="rec_h")
         
         with st.expander("⚠️ FACTORES DE RIESGO", expanded=False):
-            delta_h = st.slider(f"Impacto bajas {team_h}", 0.0, 0.3, 0.08, step=0.01)
-            motivacion_h = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05)
-            carga_fisica_h = st.slider("Carga física", 0.5, 1.5, 1.0, step=0.05)
+            delta_h = st.slider(f"Impacto bajas {team_h}", 0.0, 0.3, 0.08, step=0.01, key="delta_h")
+            motivacion_h = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05, key="mot_h")
+            carga_fisica_h = st.slider("Carga física", 0.5, 1.5, 1.0, step=0.05, key="carga_h")
 
     with col_team2:
         st.subheader(f"✈️ {team_a} (Visitante)")
@@ -1684,7 +1721,7 @@ elif menu == "🏠 App Principal":
             with col_o1:
                 g_a_ult5 = st.number_input(f"Goles (últ. 5p)", value=6, min_value=0, key="ga5")
                 xg_a_prom = st.number_input("xG promedio", value=1.40, step=0.05, key="xga")
-                tiros_arco_a = st.number_input("Tiros a puerta/p", value=4.3, step=0.1)
+                tiros_arco_a = st.number_input("Tiros a puerta/p", value=4.3, step=0.1, key="tir_a")
             with col_o2:
                 g_a_ult10 = st.number_input(f"Goles (últ. 10p)", value=12, min_value=0, key="ga10")
                 posesion_a = 100 - posesion_h
@@ -1695,13 +1732,13 @@ elif menu == "🏠 App Principal":
             col_d1, col_d2 = st.columns(2)
             with col_d1:
                 goles_rec_a = st.number_input("Goles recibidos (10p)", value=10, min_value=0, key="gra")
-                xg_contra_a = st.number_input("xG en contra/p", value=1.05, step=0.05)
+                xg_contra_a = st.number_input("xG en contra/p", value=1.05, step=0.05, key="xgca")
             with col_d2:
-                entradas_a = st.number_input("Entradas/p", value=16.2, step=0.1)
-                recuperaciones_a = st.number_input("Recuperaciones/p", value=42.5, step=0.5)
+                entradas_a = st.number_input("Entradas/p", value=16.2, step=0.1, key="ent_a")
+                recuperaciones_a = st.number_input("Recuperaciones/p", value=42.5, step=0.5, key="rec_a")
         
         with st.expander("⚠️ FACTORES DE RIESGO", expanded=False):
-            delta_a = st.slider(f"Impacto bajas {team_a}", 0.0, 0.3, 0.05, step=0.01)
+            delta_a = st.slider(f"Impacto bajas {team_a}", 0.0, 0.3, 0.05, step=0.01, key="delta_a")
             motivacion_a = st.slider("Motivación", 0.5, 1.5, 0.9, step=0.05, key="mot_a")
             carga_fisica_a = st.slider("Carga física", 0.5, 1.5, 1.1, step=0.05, key="cf_a")
 
@@ -1790,6 +1827,43 @@ elif menu == "🏠 App Principal":
     # ============ EJECUCIÓN DEL SISTEMA ============
     if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_container_width=True):
         
+        # 1. Crear el diccionario con todos los datos recopilados
+        datos = {
+            'team_h': team_h,
+            'team_a': team_a,
+            'g_h_ult5': g_h_ult5,
+            'g_h_ult10': g_h_ult10,
+            'xg_h_prom': xg_h_prom,
+            'tiros_arco_h': tiros_arco_h,
+            'posesion_h': posesion_h,
+            'precision_pases_h': precision_pases_h,
+            'goles_rec_h': goles_rec_h,
+            'xg_contra_h': xg_contra_h,
+            'entradas_h': entradas_h,
+            'recuperaciones_h': recuperaciones_h,
+            'delta_h': delta_h,
+            'motivacion_h': motivacion_h,
+            'carga_fisica_h': carga_fisica_h,
+            'g_a_ult5': g_a_ult5,
+            'g_a_ult10': g_a_ult10,
+            'xg_a_prom': xg_a_prom,
+            'tiros_arco_a': tiros_arco_a,
+            'posesion_a': posesion_a,
+            'precision_pases_a': precision_pases_a,
+            'goles_rec_a': goles_rec_a,
+            'xg_contra_a': xg_contra_a,
+            'entradas_a': entradas_a,
+            'recuperaciones_a': recuperaciones_a,
+            'delta_a': delta_a,
+            'motivacion_a': motivacion_a,
+            'carga_fisica_a': carga_fisica_a,
+            'cuotas': {'1': c1, 'X': cx, '2': c2},
+            'overround': or_val,
+            'volumen_estimado': volumen_estimado,
+            'steam_detectado': steam_detectado,
+            'entropia_mercado': entropia_mercado,
+            'liga': liga
+        }
         with st.spinner("🔬 Inicializando modelo bayesiano jerárquico..."):
             # Inicializar componentes
             modelo_bayes = ModeloBayesianoJerarquico(liga)
