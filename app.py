@@ -3,10 +3,11 @@ import streamlit as st
 
 st.set_page_config(page_title="Sistema ACBE-Kelly", layout="wide")
 
-# Sidebar navigation
+# Sidebar navigation - AÑADIR KEY ÚNICA
 menu = st.sidebar.selectbox(
     "Navegación",
-    ["🏠 App Principal", "🎓 Guía Interactiva", "📊 Historial"]
+    ["🏠 App Principal", "🎓 Guía Interactiva", "📊 Historial"],
+    key="nav_menu"  # AÑADIR ESTO
 )
 
 if menu == "🎓 Guía Interactiva":
@@ -365,6 +366,7 @@ elif menu == "🏠 App Principal":
     from scipy.optimize import minimize
     import plotly.graph_objects as go
     from datetime import datetime, timedelta
+    import uuid  # Añadir esto
     
     # ============ INICIALIZACIÓN DEL BANKROLL ============
     if 'bankroll_actual' not in st.session_state:
@@ -380,6 +382,28 @@ elif menu == "🏠 App Principal":
         st.session_state.historial_apuestas = []
     
     # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
+    
+    # Función para debuggear widgets duplicados
+    def verificar_widgets():
+        if 'debug_mode' not in st.session_state:
+            st.session_state.debug_mode = False
+        
+        # Botón para activar modo debug
+        if st.sidebar.button("🐛 Modo Debug", key="debug_btn"):
+            st.session_state.debug_mode = not st.session_state.debug_mode
+            st.rerun()
+        
+        if st.session_state.debug_mode:
+            st.sidebar.warning("MODO DEBUG ACTIVADO")
+            st.sidebar.write(f"Widgets en sesión: {len(st.session_state)}")
+            
+            # Listar todos los widgets con problemas potenciales
+            widget_keys = [key for key in st.session_state.keys() if 'widget' in key.lower()]
+            if widget_keys:
+                st.sidebar.write("Widgets detectados:", widget_keys)
+
+    # Llama a la función en tu sidebar
+    verificar_widgets()
 
     def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, pick=None, descripcion=""):
         """
@@ -1577,11 +1601,11 @@ elif menu == "🏠 App Principal":
     with st.sidebar.expander("🎯 OBJETIVOS DE PERFORMANCE", expanded=True):
         col_obj1, col_obj2 = st.columns(2)
         with col_obj1:
-            roi_target = st.slider("ROI Target (%)", 5, 25, 12)
-            cvar_target = st.slider("CVaR Máximo (%)", 5, 25, 15)
+            roi_target = st.slider("ROI Target (%)", 5, 25, 12, key="roi_target_slider")
+            cvar_target = st.slider("CVaR Máximo (%)", 5, 25, 15, key="cvar_target_slider")
         with col_obj2:
-            max_dd = st.slider("Max Drawdown (%)", 10, 40, 20)
-            sharpe_min = st.slider("Sharpe Mínimo", 0.5, 3.0, 1.5)
+            max_dd = st.slider("Max Drawdown (%)", 10, 40, 20, key="max_dd_slider")
+            sharpe_min = st.slider("Sharpe Mínimo", 0.5, 3.0, 1.5, key="sharpe_min_slider")
         
         st.markdown("---")
         st.markdown(f"""
@@ -1591,20 +1615,6 @@ elif menu == "🏠 App Principal":
         - Max DD: < {max_dd}%
         - Sharpe: > {sharpe_min}
         """)
-
-    with st.sidebar.expander("📊 PARÁMETROS BAYESIANOS", expanded=False):
-        liga = st.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"])
-        
-        st.markdown("**Priors del Modelo:**")
-        col_prior1, col_prior2 = st.columns(2)
-        with col_prior1:
-            confianza_prior = st.slider("Confianza Prior", 0.1, 1.0, 0.7)
-        with col_prior2:
-            aprendizaje_bayes = st.slider("Tasa Aprendizaje", 0.1, 1.0, 0.5)
-        
-        st.markdown("**Actualización Bayesiana:**")
-        peso_reciente = st.slider("Peso Partidos Recientes", 0.0, 1.0, 0.7)
-        peso_historico = 1 - peso_reciente
         
     # ============ BARRA LATERAL MEJORADA ============
     st.sidebar.markdown("---")
@@ -1629,8 +1639,8 @@ elif menu == "🏠 App Principal":
             f"{cambio_porcentaje:.1f}%"
         )
 
-    # Botón para resetear bankroll
-    if st.sidebar.button("🔄 Resetear Bankroll", type="secondary", use_container_width=True):
+    # Botón para resetear bankroll - AÑADIR KEY ÚNICA
+    if st.sidebar.button("🔄 Resetear Bankroll", type="secondary", use_container_width=True, key="reset_bankroll_btn"):
         st.session_state.bankroll_actual = 1000
         st.session_state.bankroll_inicial_sesion = 1000
         st.session_state.historial_bankroll = []
@@ -1640,45 +1650,46 @@ elif menu == "🏠 App Principal":
 
     st.sidebar.header("📥 INGESTA DE DATOS")
 
-    team_h = st.sidebar.text_input("Equipo Local", value="Bologna")
-    team_a = st.sidebar.text_input("Equipo Visitante", value="AC Milan")
+    team_h = st.sidebar.text_input("Equipo Local", value="Bologna", key="team_h_input")
+    team_a = st.sidebar.text_input("Equipo Visitante", value="AC Milan", key="team_a_input")
 
     # --- SECCIÓN MERCADO Y CUOTAS ---
     st.sidebar.header("💰 MERCADO")
     col_c1, col_c2, col_c3 = st.sidebar.columns(3)
     with col_c1:
-        c1 = st.number_input("1", value=2.90, min_value=1.01, step=0.01, key="cuota1")
+        c1 = st.number_input("1", value=2.90, min_value=1.01, step=0.01, key="cuota1_input")
     with col_c2:
-        cx = st.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cuotax")
+        cx = st.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cuotax_input")
     with col_c3:
-        c2 = st.number_input("2", value=2.45, min_value=1.01, step=0.01, key="cuota2")
+        c2 = st.number_input("2", value=2.45, min_value=1.01, step=0.01, key="cuota2_input")
 
     st.sidebar.markdown("---")
     st.sidebar.header("📈 MÉTRICAS DE MERCADO")
 
     # Calcular métricas de mercado
     or_val = (1/c1 + 1/cx + 1/c2) - 1
-    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1)
-    steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005)
+    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="volumen_slider")
+    steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider")
 
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     with col_met1:
-        st.metric("Overround", f"{or_val:.2%}")
+        st.metric("Overround", f"{or_val:.2%}", key="or_metric")
     with col_met2:
-        st.metric("Margen Casa", f"{(or_val/(1+or_val)*100):.1f}%")
+        st.metric("Margen Casa", f"{(or_val/(1+or_val)*100):.1f}%", key="margen_metric")
     with col_met3:
-        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01)
-        st.metric("Entropía", f"{entropia_mercado:.3f}")
+        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01, key="entropia_slider")
+        st.metric("Entropía", f"{entropia_mercado:.3f}", key="entropia_metric")
 
     # --- PARÁMETROS DE RIESGO ---
     st.sidebar.header("🎯 PARÁMETROS DE RIESGO")
-    roi_target = st.sidebar.slider("ROI Target (%)", 0.0, 20.0, 10.0, step=0.5) / 100.0
-    cvar_target = st.sidebar.slider("CVaR Target (%)", 0.0, 10.0, 5.0, step=0.5) / 100.0
-    max_dd = st.sidebar.slider("Max Drawdown (%)", 0.0, 30.0, 15.0, step=0.5) / 100.0
-    sharpe_min = st.sidebar.slider("Sharpe Mínimo", 0.0, 3.0, 1.0, step=0.1)
+    roi_target = st.sidebar.slider("ROI Target (%)", 0.0, 20.0, 10.0, step=0.5, key="roi_target_sidebar") / 100.0
+    cvar_target = st.sidebar.slider("CVaR Target (%)", 0.0, 10.0, 5.0, step=0.5, key="cvar_target_sidebar") / 100.0
+    max_dd = st.sidebar.slider("Max Drawdown (%)", 0.0, 30.0, 15.0, step=0.5, key="max_dd_sidebar") / 100.0
+    sharpe_min = st.sidebar.slider("Sharpe Mínimo", 0.0, 3.0, 1.0, step=0.1, key="sharpe_min_sidebar")
 
-    # Selector de liga
-    liga = st.sidebar.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"])
+    # Selector de liga - ⚠️ SOLO UNO! - ELIMINAR EL OTRO
+    liga = st.sidebar.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"], 
+                               key="liga_selector_sidebar")
 
     # --- PANEL PRINCIPAL: DATOS DETALLADOS ---
     st.header("📈 ANÁLISIS DE EQUIPOS")
@@ -1770,7 +1781,9 @@ elif menu == "🏠 App Principal":
         st.metric("Entropía", f"{entropia_mercado:.3f}")
 
     # ============ EJECUCIÓN DEL SISTEMA ============
-    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", use_container_width=True):  
+    # BOTÓN PRINCIPAL CON KEY ÚNICA
+    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", 
+                        use_container_width=True, key="ejecutar_analisis_btn"):  
         
         datos = {
             'team_h': team_h,
@@ -2549,10 +2562,13 @@ elif menu == "🏠 App Principal":
         # Obtener recomendaciones de la última ejecución
         recomendaciones = st.session_state.get('recomendaciones_fase4', [])
 
+        # En la sección "REGISTRAR RESULTADOS DE APUESTAS"
         if recomendaciones:
             for i, rec in enumerate(recomendaciones):
-                # Solo mostrar picks con stake > 0
                 if rec.get("stake_abs", 0) > 0:
+                    # Generar un UUID único para esta iteración
+                    unique_id = str(uuid.uuid4())[:8]  # Toma solo los primeros 8 caracteres
+                    
                     with st.container():
                         col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
                         
@@ -2564,9 +2580,9 @@ elif menu == "🏠 App Principal":
                         with col2:
                             st.metric("", "", delta=f"{rec.get('kelly_pct', 0):.1f}%")
                         
-                        # 🔴🔴🔴 AQUÍ VA EL CÓDIGO DE LOS BOTONES QUE ME MOSTRASTE 🔴🔴🔴
                         with col3:
-                            if st.button("✅ Ganó", key=f"win_{i}_{datetime.now().timestamp()}", 
+                            # ✅ CORREGIDO: Usar UUID único
+                            if st.button("✅ Ganó", key=f"win_{unique_id}", 
                                     type="primary", use_container_width=True):
                                 ganancia = rec.get('stake_abs', 0) * (rec.get('cuota_numerico', 2.0) - 1)
                                 resultado = actualizar_bankroll(
@@ -2582,13 +2598,13 @@ elif menu == "🏠 App Principal":
                                     'ganancia': ganancia,
                                     'timestamp': datetime.now()
                                 }
-                                # En lugar de st.rerun(), usar st.success y forzar recálculo
                                 st.success(f"✅ Ganancia registrada: €{ganancia:.2f}")
                                 # Refrescar solo las métricas
                                 st.experimental_rerun()
                         
                         with col4:
-                            if st.button("❌ Perdió", key=f"loss_{i}_{datetime.now().timestamp()}", 
+                            # ✅ CORREGIDO: Usar UUID único
+                            if st.button("❌ Perdió", key=f"loss_{unique_id}", 
                                     type="secondary", use_container_width=True):
                                 resultado = actualizar_bankroll(
                                     resultado_apuesta="perdida",
@@ -2607,7 +2623,8 @@ elif menu == "🏠 App Principal":
                                 st.experimental_rerun()
                         
                         with col5:
-                            if st.button("➖ Empate", key=f"void_{i}_{datetime.now().timestamp()}", 
+                            # ✅ CORREGIDO: Usar UUID único
+                            if st.button("➖ Empate", key=f"void_{unique_id}", 
                                     type="secondary", use_container_width=True):
                                 st.info("💰 Apuesta anulada - Stake devuelto")
                                 st.session_state.ultima_apuesta = {
@@ -2615,7 +2632,6 @@ elif menu == "🏠 App Principal":
                                     'monto': rec.get('stake_abs', 0),
                                     'timestamp': datetime.now()
                                 }
-                                # No se actualiza bankroll, stake devuelto
                         
                         st.markdown("---")
         else:
