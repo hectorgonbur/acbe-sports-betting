@@ -1668,9 +1668,21 @@ elif menu == "🏠 App Principal":
 
     # Calcular métricas de mercado
     or_val = (1/c1 + 1/cx + 1/c2) - 1
+    
+    # Verificación y conversión segura
+    if or_val is None:
+        or_val = 0.0  # valor por defecto
+    elif isinstance(or_val, str):
+        try:
+            # Eliminar cualquier signo % y convertir a float
+            or_val = float(or_val.replace('%', '')) / 100
+        except ValueError:
+            or_val = 0.0
+    # === FIN DE LA VERIFICACIÓN ===
+
     volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="volumen_slider")
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider")
-
+    
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     with col_met1:
         st.metric("Overround", f"{or_val:.2%}", key="or_metric")
@@ -1768,17 +1780,30 @@ elif menu == "🏠 App Principal":
 
     # Calcular métricas de mercado
     or_val = (1/c1 + 1/cx + 1/c2) - 1
+    
+    # === VERIFICACIÓN DE SEGURIDAD ===
+    if or_val is None:
+        or_val = 0.0
+    elif isinstance(or_val, str):
+        try:
+            or_val = float(or_val.replace('%', '')) / 100
+        except ValueError:
+            or_val = 0.0
+    # ================================
+    
     volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1)
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005)
 
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     with col_met1:
-        st.metric("Overround", f"{or_val:.2%}")
+        st.metric("Overround", f"{or_val:.2%}", key="or_metric")
     with col_met2:
-        st.metric("Margen Casa", f"{(or_val/(1+or_val)*100):.1f}%")
+        # También corrige el error de formato aquí
+        margen_casa = (or_val/(1+or_val))*100
+        st.metric("Margen Casa", f"{margen_casa:.1f}%", key="margin_metric")
     with col_met3:
-        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01)
-        st.metric("Entropía", f"{entropia_mercado:.3f}")
+        entropia_mercado = st.sidebar.slider("Entropia (H)", 0.3, 0.9, 0.62, step=0.01)
+        st.metric("Entropia", f"{entropia_mercado:.3f}", key="entropia_metric")
 
     # ============ EJECUCIÓN DEL SISTEMA ============
     # BOTÓN PRINCIPAL CON KEY ÚNICA
