@@ -366,63 +366,79 @@ elif menu == "🏠 App Principal":
     import plotly.graph_objects as go
     from datetime import datetime, timedelta
     
+    # ============ INICIALIZACIÓN DEL BANKROLL ============
+    if 'bankroll_actual' not in st.session_state:
+        st.session_state.bankroll_actual = 1000.0
+
+    if 'bankroll_inicial_sesion' not in st.session_state:
+        st.session_state.bankroll_inicial_sesion = st.session_state.bankroll_actual
+
+    if 'historial_bankroll' not in st.session_state:
+        st.session_state.historial_bankroll = []
+
+    if 'historial_apuestas' not in st.session_state:
+        st.session_state.historial_apuestas = []
+    
     # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
 
-    def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, detalle=""):
+    def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, pick=None, descripcion=""):
         """
         Actualiza el bankroll según el resultado de una apuesta
         
         Args:
-            resultado_apuesta: "ganada", "perdida", "empatada"
+            resultado_apuesta: "ganada", "perdida"
             monto_apostado: Cantidad apostada en €
             cuota: Cuota de la apuesta (solo para ganadas)
-            detalle: Descripción de la operación
+            pick: Tipo de apuesta (ej: "1", "X", "2")
+            descripcion: Descripción de la operación
         """
-        import streamlit as st
-        from datetime import datetime
-        
-        # Asegurar que existe bankroll_actual
+        # Verificar que exista el bankroll
         if 'bankroll_actual' not in st.session_state:
             st.session_state.bankroll_actual = 1000.0
         
-        # Asegurar que existe historial_bankroll
+        # Verificar que exista historial
         if 'historial_bankroll' not in st.session_state:
             st.session_state.historial_bankroll = []
         
-        # Calcular resultado
+        if 'historial_apuestas' not in st.session_state:
+            st.session_state.historial_apuestas = []
+        
+        # Crear registro de apuesta
+        registro_apuesta = {
+            'timestamp': datetime.now(),
+            'resultado': resultado_apuesta,
+            'stake': monto_apostado,
+            'cuota': cuota if cuota else 0,
+            'pick': pick,
+            'descripcion': descripcion
+        }
+        
+        # Calcular ganancia/pérdida
         if resultado_apuesta == "ganada" and cuota:
-            ganancia = monto_apostado * (cuota - 1)
-            st.session_state.bankroll_actual += ganancia
-            
-            # Registrar en historial
-            registro = {
-                'timestamp': datetime.now(),
-                'operacion': 'apuesta_ganada',
-                'monto': ganancia,
-                'detalle': f"{detalle} @ {cuota:.2f}",
-                'bankroll_final': st.session_state.bankroll_actual
-            }
-            st.session_state.historial_bankroll.append(registro)
-            
-            return ganancia
+            ganancia_neta = monto_apostado * (cuota - 1)
+            st.session_state.bankroll_actual += ganancia_neta
+            registro_apuesta['ganancia'] = ganancia_neta
+            registro_apuesta['resultado_final'] = f"+€{ganancia_neta:.2f}"
             
         elif resultado_apuesta == "perdida":
             st.session_state.bankroll_actual -= monto_apostado
-            
-            # Registrar en historial
-            registro = {
-                'timestamp': datetime.now(),
-                'operacion': 'apuesta_perdida',
-                'monto': -monto_apostado,
-                'detalle': detalle,
-                'bankroll_final': st.session_state.bankroll_actual
-            }
-            st.session_state.historial_bankroll.append(registro)
-            
-            return -monto_apostado
-            
-        else:  # empatada
-            return 0
+            registro_apuesta['perdida'] = monto_apostado
+            registro_apuesta['resultado_final'] = f"-€{monto_apostado:.2f}"
+        
+        # Registrar en historial
+        registro_bankroll = {
+            'timestamp': datetime.now(),
+            'operacion': f'apuesta_{resultado_apuesta}',
+            'monto': registro_apuesta.get('ganancia', -registro_apuesta.get('perdida', 0)),
+            'detalle': registro_apuesta.get('descripcion', ''),
+            'bankroll_final': st.session_state.bankroll_actual
+        }
+        
+        st.session_state.historial_bankroll.append(registro_bankroll)
+        st.session_state.historial_apuestas.append(registro_apuesta)
+        
+        # Retornar resultado
+        return registro_apuesta.get('ganancia', -registro_apuesta.get('perdida', 0))
     
     # ============ FUNCIÓN PARA CONVERTIR NUMPY ============
     def convertir_datos_python(datos):
@@ -1572,36 +1588,36 @@ elif menu == "🏠 App Principal":
         peso_reciente = st.slider("Peso Partidos Recientes", 0.0, 1.0, 0.7)
         peso_historico = 1 - peso_reciente
         
-    # ============ GESTIÓN DE BANKROLL ============
+    # ============ BARRA LATERAL MEJORADA ============
     st.sidebar.markdown("---")
-    st.sidebar.subheader("💰 GESTIÓN DE BANKROLL")
+    st.sidebar.subheader("💰 BANKROLL EN TIEMPO REAL")
 
-    # Input para el bankroll inicial
-    bankroll_inicial = st.sidebar.number_input(
-        "Bankroll Inicial (€)",
-        min_value=10.0,
-        max_value=100000.0,
-        value=1000.0,
-        step=100.0,
-        key="bankroll_inicial"
-    )
+    # Mostrar bankroll actual
+    bankroll_actual = st.session_state.get('bankroll_actual', 1000)
+    bankroll_inicial = st.session_state.get('bankroll_inicial_sesion', 1000)
 
-    # Mostrar bankroll actual (si existe)
-    if 'bankroll_actual' in st.session_state:
+    col_side1, col_side2 = st.sidebar.columns(2)
+    with col_side1:
         st.sidebar.metric(
-            "💵 Bankroll Actual", 
-            f"€{st.session_state.bankroll_actual:,.2f}",
-            delta=f"€{st.session_state.bankroll_actual - bankroll_inicial:,.2f}" 
+            "💵 Actual", 
+            f"€{bankroll_actual:,.2f}",
+            delta=f"€{bankroll_actual - bankroll_inicial:,.2f}"
         )
-    else:
-        # Inicializar el bankroll actual
-        st.session_state.bankroll_actual = bankroll_inicial
-        st.sidebar.metric("💵 Bankroll Actual", f"€{st.session_state.bankroll_actual:,.2f}")
+
+    with col_side2:
+        cambio_porcentaje = ((bankroll_actual - bankroll_inicial) / bankroll_inicial * 100) if bankroll_inicial > 0 else 0
+        st.sidebar.metric(
+            "📊 ROI", 
+            f"{cambio_porcentaje:.1f}%"
+        )
 
     # Botón para resetear bankroll
-    if st.sidebar.button("🔄 Resetear Bankroll", type="secondary"):
-        st.session_state.bankroll_actual = bankroll_inicial
-        st.success("✅ Bankroll reseteado al valor inicial")
+    if st.sidebar.button("🔄 Resetear Bankroll", type="secondary", use_container_width=True):
+        st.session_state.bankroll_actual = 1000
+        st.session_state.bankroll_inicial_sesion = 1000
+        st.session_state.historial_bankroll = []
+        st.session_state.historial_apuestas = []
+        st.success("✅ Bankroll reseteado a €1,000")
         st.rerun()
 
     st.sidebar.header("📥 INGESTA DE DATOS")
@@ -2310,70 +2326,108 @@ elif menu == "🏠 App Principal":
             else:
                 st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
             
-            # ============ REGISTRO DE RESULTADOS DE APUESTAS ============
-            st.markdown("---")
-            st.subheader("🎰 REGISTRAR RESULTADOS DE APUESTAS")
+        # ============ SECCIÓN SIEMPRE VISIBLE: REGISTRO DE APUESTAS ============
+        st.markdown("---")
+        st.subheader("🎰 REGISTRAR RESULTADOS DE APUESTAS")
 
-            if recomendaciones and len(recomendaciones) > 0:
-                st.info("📝 **Registra los resultados de tus apuestas para actualizar el bankroll automáticamente:**")
-                
-                for i, rec in enumerate(recomendaciones):
-                    # Solo mostrar picks con stake > 0
-                    if rec.get("stake_abs", 0) > 0:
-                        col_res1, col_res2, col_res3, col_res4 = st.columns([3, 2, 1, 1])
+        # Mostrar métricas del bankroll
+        col_br1, col_br2, col_br3 = st.columns(3)
+
+        with col_br1:
+            st.metric(
+                "💰 Bankroll Actual", 
+                f"€{st.session_state.get('bankroll_actual', 1000):,.2f}"
+            )
+
+        with col_br2:
+            bankroll_inicial_ref = st.session_state.get('bankroll_inicial_sesion', 1000)
+            cambio = st.session_state.get('bankroll_actual', 1000) - bankroll_inicial_ref
+            cambio_porcentaje = (cambio / bankroll_inicial_ref * 100) if bankroll_inicial_ref > 0 else 0
+            st.metric(
+                "📈 Cambio Total", 
+                f"€{cambio:,.2f}",
+                delta=f"{cambio_porcentaje:.1f}%"
+            )
+
+        with col_br3:
+            st.metric(
+                "🎯 ROI Acumulado",
+                f"{cambio_porcentaje:.1f}%"
+            )
+
+        # Mostrar recomendaciones activas para registrar
+        st.markdown("---")
+        st.subheader("📝 Apuestas Pendientes de Registro")
+
+        # Obtener recomendaciones de la última ejecución
+        recomendaciones = st.session_state.get('recomendaciones_fase4', [])
+
+        if recomendaciones:
+            for i, rec in enumerate(recomendaciones):
+                # Solo mostrar picks con stake > 0
+                if rec.get("stake_abs", 0) > 0:
+                    with st.container():
+                        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
                         
-                        with col_res1:
-                            st.write(f"**{rec['resultado']}**")
+                        with col1:
+                            st.markdown(f"**{rec['resultado']}**")
                             st.caption(f"Stake: €{rec.get('stake_abs', 0):.2f} @ {rec.get('cuota_numerico', 0):.2f}")
+                            st.caption(f"EV: {rec['ev']}")
                         
-                        with col_res2:
-                            st.write(f"EV: {rec['ev']}")
+                        with col2:
+                            st.metric("", "", delta=f"{rec.get('kelly_pct', 0):.1f}%")
                         
-                        with col_res3:
-                            if st.button("✅ Ganó", key=f"win_{i}", type="primary", use_container_width=True):
-                                ganancia = actualizar_bankroll(
-                                    "ganada", 
-                                    rec.get('stake_abs', 0), 
-                                    rec.get('cuota_numerico', 2.0),
-                                    f"Apuesta {rec['resultado']}"
+                        with col3:
+                            if st.button("✅ Ganó", key=f"win_{i}_{datetime.now().timestamp()}", 
+                                    type="primary", use_container_width=True):
+                                resultado = actualizar_bankroll(
+                                    resultado_apuesta="ganada",
+                                    monto_apostado=rec.get('stake_abs', 0),
+                                    cuota=rec.get('cuota_numerico', 2.0),
+                                    pick=rec['resultado'],
+                                    descripcion=f"Apuesta {rec['resultado']} ganada"
                                 )
-                                st.success(f"✅ +€{ganancia:.2f}")
-                                st.rerun()
+                                st.success(f"✅ Ganancia: €{resultado:.2f}")
+                                # Usar callback para evitar rerun inmediato
+                                st.session_state.last_update = datetime.now()
                         
-                        with col_res4:
-                            if st.button("❌ Perdió", key=f"loss_{i}", type="secondary", use_container_width=True):
-                                perdida = actualizar_bankroll(
-                                    "perdida", 
-                                    rec.get('stake_abs', 0),
-                                    detalle=f"Apuesta {rec['resultado']}"
+                        with col4:
+                            if st.button("❌ Perdió", key=f"loss_{i}_{datetime.now().timestamp()}", 
+                                    type="secondary", use_container_width=True):
+                                resultado = actualizar_bankroll(
+                                    resultado_apuesta="perdida",
+                                    monto_apostado=rec.get('stake_abs', 0),
+                                    pick=rec['resultado'],
+                                    descripcion=f"Apuesta {rec['resultado']} perdida"
                                 )
-                                st.error(f"❌ -€{abs(perdida):.2f}")
-                                st.rerun()
-                
-                # Mostrar bankroll actualizado
-                col_br1, col_br2, col_br3 = st.columns(3)
-                
-                with col_br1:
-                    st.metric(
-                        "💰 Bankroll Actual", 
-                        f"€{st.session_state.get('bankroll_actual', 1000):,.2f}"
-                    )
-                
-                with col_br2:
-                    cambio = st.session_state.get('bankroll_actual', 1000) - bankroll_inicial
-                    st.metric(
-                        "📈 Cambio Total", 
-                        f"€{cambio:,.2f}",
-                        delta=f"{(cambio/bankroll_inicial*100):.1f}%" if bankroll_inicial > 0 else "0%"
-                    )
-                
-                with col_br3:
-                    st.metric(
-                        "🎯 ROI Acumulado",
-                        f"{(cambio/bankroll_inicial*100):.1f}%" if bankroll_inicial > 0 else "0%"
-                    )
-            else:
-                st.info("📭 No hay recomendaciones para registrar resultados")
+                                st.error(f"❌ Pérdida: €{abs(resultado):.2f}")
+                                st.session_state.last_update = datetime.now()
+                        
+                        with col5:
+                            if st.button("➖ Empate", key=f"void_{i}_{datetime.now().timestamp()}", 
+                                    type="secondary", use_container_width=True):
+                                st.info("💰 Apuesta anulada - Stake devuelto")
+                                # Para empates, simplemente no hacemos nada (stake devuelto)
+                                st.session_state.last_update = datetime.now()
+                        
+                        st.markdown("---")
+        else:
+            st.info("📭 No hay apuestas activas para registrar. Ejecuta un análisis primero.")
+            
+        # ============ HISTORIAL Y ACTUALIZACIÓN ============
+        # 🔴🔴🔴 AQUÍ VA EL CÓDIGO QUE PREGUNTAS 🔴🔴🔴
+        col_refresh1, col_refresh2 = st.columns([3, 1])
+        with col_refresh2:
+            if st.button("🔄 Actualizar Vista", type="secondary", use_container_width=True):
+                    st.rerun()
+
+        if st.session_state.get('historial_apuestas'):
+            with st.expander("📜 Historial Reciente de Apuestas", expanded=False):
+                for apuesta in reversed(st.session_state.historial_apuestas[-5:]):
+                    fecha = apuesta['timestamp'].strftime("%H:%M")
+                    resultado = apuesta['resultado_final'] if 'resultado_final' in apuesta else "N/A"
+                    st.write(f"{fecha} - {apuesta.get('pick', 'N/A')} - {apuesta.get('descripcion', '')} - {resultado}")
+        # ============ FIN DE LA SECCIÓN DE REGISTRO ============    
     
             # Guardar en historial (OPCIONAL - si quieres mantenerlo)
             # Asegúrate de que picks_con_valor, team_h, team_a y logger existan
