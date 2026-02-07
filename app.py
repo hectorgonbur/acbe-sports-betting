@@ -39,6 +39,10 @@ if 'entropia_mercado' not in st.session_state:
 if 'bankroll_actual' not in st.session_state:
     st.session_state.bankroll_actual = 1000.0
 
+# Variable temporal para depósitos/retiros (SOLUCIÓN AL ERROR)
+if 'bankroll_temp' not in st.session_state:
+    st.session_state.bankroll_temp = 0.0
+
 if 'bankroll_inicial_sesion' not in st.session_state:
     st.session_state.bankroll_inicial_sesion = st.session_state.bankroll_actual
 
@@ -577,16 +581,11 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("⚙️ CONFIGURACIÓN DEL SISTEMA")
     
-    # BANKROLL EDITABLE - CON KEY ÚNICO
+    # BANKROLL EDITABLE - CON KEY ÚNICO (CORREGIDO)
     st.sidebar.subheader("💰 GESTIÓN DE CAPITAL")
     
-    bankroll_actual = st.sidebar.number_input(
-        "Bankroll Actual (€)",
-        min_value=0.0,
-        value=float(st.session_state.bankroll_actual),
-        step=50.0,
-        key="bankroll_actual"  # <--- CRÍTICO: Key exacta para sincronización bidireccional
-    )
+    # Mostrar el bankroll actual como métrica en lugar de number_input editable
+    st.sidebar.metric("Bankroll Actual", f"€{st.session_state.bankroll_actual:,.2f}")
     
     # BACKUP/IMPORT JSON
     st.sidebar.markdown("---")
@@ -680,7 +679,7 @@ if menu == "🏠 App Principal":
                                key="liga_selector_sidebar")
     
     # ============================================
-    # DEPÓSITOS Y RETIROS
+    # DEPÓSITOS Y RETIROS (CORREGIDO)
     # ============================================
     
     st.sidebar.markdown("---")
@@ -689,10 +688,11 @@ if menu == "🏠 App Principal":
     col_dep1, col_dep2 = st.sidebar.columns(2)
     
     with col_dep1:
-        deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0)
-        if st.sidebar.button("📥 Depositar", use_container_width=True):
+        deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0, key="deposito_input")
+        if st.sidebar.button("📥 Depositar", use_container_width=True, key="btn_depositar"):
             if deposito > 0:
-                st.session_state.bankroll_actual += deposito
+                # Usamos una variable temporal para evitar el error de Streamlit
+                st.session_state.bankroll_temp = st.session_state.bankroll_actual + deposito
                 
                 if 'historial_bankroll' not in st.session_state:
                     st.session_state.historial_bankroll = []
@@ -702,18 +702,21 @@ if menu == "🏠 App Principal":
                     'operacion': 'deposito',
                     'monto': deposito,
                     'detalle': "Depósito manual",
-                    'bankroll_final': st.session_state.bankroll_actual
+                    'bankroll_final': st.session_state.bankroll_temp
                 }
                 st.session_state.historial_bankroll.append(registro)
                 
+                # Actualizar el bankroll principal después del rerun
+                st.session_state.bankroll_actual = st.session_state.bankroll_temp
                 st.sidebar.success(f"✅ Depositados €{deposito:.2f}")
                 st.rerun()
     
     with col_dep2:
-        retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0)
-        if st.sidebar.button("📤 Retirar", use_container_width=True):
+        retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0, key="retiro_input")
+        if st.sidebar.button("📤 Retirar", use_container_width=True, key="btn_retirar"):
             if retiro > 0 and retiro <= st.session_state.bankroll_actual:
-                st.session_state.bankroll_actual -= retiro
+                # Usamos una variable temporal para evitar el error de Streamlit
+                st.session_state.bankroll_temp = st.session_state.bankroll_actual - retiro
                 
                 if 'historial_bankroll' not in st.session_state:
                     st.session_state.historial_bankroll = []
@@ -723,10 +726,12 @@ if menu == "🏠 App Principal":
                     'operacion': 'retiro',
                     'monto': -retiro,
                     'detalle': "Retiro manual",
-                    'bankroll_final': st.session_state.bankroll_actual
+                    'bankroll_final': st.session_state.bankroll_temp
                 }
                 st.session_state.historial_bankroll.append(registro)
                 
+                # Actualizar el bankroll principal después del rerun
+                st.session_state.bankroll_actual = st.session_state.bankroll_temp
                 st.sidebar.success(f"✅ Retirados €{retiro:.2f}")
                 st.rerun()
             elif retiro > st.session_state.bankroll_actual:
