@@ -1695,9 +1695,10 @@ elif menu == "🏠 App Principal":
     # Calcular métricas de mercado
     or_val = calcular_or_val_seguro(c1, cx, c2)
 
-    # ============ DEBUG (opcional, para verificar) ============
-    st.sidebar.caption(f"Debug: c1={c1}, cx={cx}, c2={c2}")
-    st.sidebar.caption(f"Debug: or_val={or_val}, type={type(or_val)}")
+    # En la primera sección (la que SÍ debes mantener), justo después de calcular or_val:
+    st.sidebar.write("🔍 DEBUG 1 - Métricas de mercado:")
+    st.sidebar.write(f"c1={c1}, cx={cx}, c2={c2}")
+    st.sidebar.write(f"or_val calculado seguro = {or_val}, tipo = {type(or_val)}")
 
     # ============ GARANTIZAR QUE or_val SEA FLOAT ============
     # Ya lo hace la función, pero por si acaso:
