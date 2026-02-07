@@ -13,17 +13,40 @@ from scipy import stats
 from scipy.optimize import minimize
 import plotly.graph_objects as go
 import uuid
-import warnings
-warnings.filterwarnings('ignore')
 
 # ============================================
 # CONFIGURACIÓN DE PÁGINA
 # ============================================
-st.set_page_config(
-    page_title="Sistema ACBE-Kelly v3.0", 
-    layout="wide",
-    page_icon="🎯"
-)
+st.set_page_config(page_title="Sistema ACBE-Kelly", layout="wide")
+
+# ============================================
+# INICIALIZACIÓN DEL ESTADO DE LA SESIÓN
+# ============================================
+
+# Diccionario Maestro (PATRÓN COCINA/SALÓN)
+if 'dm' not in st.session_state:
+    st.session_state['dm'] = {}
+
+# Bandera de análisis ejecutado
+if 'analisis_ejecutado' not in st.session_state:
+    st.session_state['analisis_ejecutado'] = False
+
+# Mantener compatibilidad con sistema anterior
+if 'entropia_mercado' not in st.session_state:
+    st.session_state['entropia_mercado'] = 0.620
+
+# Inicialización del bankroll
+if 'bankroll_actual' not in st.session_state:
+    st.session_state.bankroll_actual = 1000.0
+
+if 'bankroll_inicial_sesion' not in st.session_state:
+    st.session_state.bankroll_inicial_sesion = st.session_state.bankroll_actual
+
+if 'historial_bankroll' not in st.session_state:
+    st.session_state.historial_bankroll = []
+
+if 'historial_apuestas' not in st.session_state:
+    st.session_state.historial_apuestas = []
 
 # ============================================
 # CLASES DEL NÚCLEO MATEMÁTICO (GLOBALES)
@@ -389,8 +412,8 @@ class BacktestSintetico:
                 "cvar_95": df_metricas["return"][df_metricas["return"] <= np.percentile(df_metricas["return"], 5)].mean(),
                 "prob_profit": (df_metricas["return"] > 0).mean(),
                 "ratio_ganancia_perdida": abs(df_metricas["return"][df_metricas["return"] > 0].mean() / 
-                                              df_metricas["return"][df_metricas["return"] < 0].mean()) 
-                                      if len(df_metricas["return"][df_metricas["return"] < 0]) > 0 else 999
+                                            df_metricas["return"][df_metricas["return"] < 0].mean()) 
+                                    if len(df_metricas["return"][df_metricas["return"] < 0]) > 0 else 999
             },
             "distribucion_retornos": df_metricas["return"].values
         }
@@ -519,9 +542,6 @@ def importar_estado_json(json_data):
         estado = json.loads(json_data)
         
         st.session_state.bankroll_actual = float(estado.get('bankroll_actual', 1000.0))
-        # Actualizamos también el input widget para que se refleje visualmente
-        st.session_state['bankroll_input'] = float(estado.get('bankroll_actual', 1000.0))
-        
         st.session_state.bankroll_inicial_sesion = float(estado.get('bankroll_inicial_sesion', 1000.0))
         st.session_state.historial_apuestas = estado.get('historial_apuestas', [])
         st.session_state.historial_bankroll = estado.get('historial_bankroll', [])
@@ -531,39 +551,6 @@ def importar_estado_json(json_data):
     except Exception as e:
         st.error(f"Error al importar JSON: {str(e)}")
         return False
-
-# ============================================
-# INICIALIZACIÓN DEL ESTADO DE LA SESIÓN
-# ============================================
-
-# Diccionario Maestro (PATRÓN COCINA/SALÓN)
-if 'dm' not in st.session_state:
-    st.session_state['dm'] = {}
-
-# Bandera de análisis ejecutado
-if 'analisis_ejecutado' not in st.session_state:
-    st.session_state['analisis_ejecutado'] = False
-
-# Mantener compatibilidad con sistema anterior
-if 'entropia_mercado' not in st.session_state:
-    st.session_state['entropia_mercado'] = 0.620
-
-# Inicialización del bankroll
-if 'bankroll_actual' not in st.session_state:
-    st.session_state.bankroll_actual = 1000.0
-
-if 'bankroll_inicial_sesion' not in st.session_state:
-    st.session_state.bankroll_inicial_sesion = st.session_state.bankroll_actual
-
-if 'historial_bankroll' not in st.session_state:
-    st.session_state.historial_bankroll = []
-
-if 'historial_apuestas' not in st.session_state:
-    st.session_state.historial_apuestas = []
-
-# Inicializar sistema de logging
-if 'logger' not in st.session_state:
-    st.session_state.logger = SistemaLogging()
 
 # ============================================
 # NAVEGACIÓN PRINCIPAL
@@ -1272,7 +1259,7 @@ if menu == "🏠 App Principal":
                             
                             with col_btn1:
                                 if st.button(f"✅ GANADA", key=f"win_{i}_{uuid.uuid4()}", 
-                                             type="primary", use_container_width=True):
+                                          type="primary", use_container_width=True):
                                     ganancia = rec.get('stake_abs', 0) * (rec.get('cuota_numerico', 2.0) - 1)
                                     resultado = actualizar_bankroll(
                                         resultado_apuesta="ganada",
@@ -1286,7 +1273,7 @@ if menu == "🏠 App Principal":
                             
                             with col_btn2:
                                 if st.button(f"❌ PERDIDA", key=f"loss_{i}_{uuid.uuid4()}", 
-                                             type="secondary", use_container_width=True):
+                                          type="secondary", use_container_width=True):
                                     resultado = actualizar_bankroll(
                                         resultado_apuesta="perdida",
                                         monto_apostado=rec.get('stake_abs', 0),
@@ -1298,7 +1285,7 @@ if menu == "🏠 App Principal":
                             
                             with col_btn3:
                                 if st.button(f"🔄 VOID", key=f"void_{i}_{uuid.uuid4()}", 
-                                             type="secondary", use_container_width=True):
+                                          type="secondary", use_container_width=True):
                                     resultado = actualizar_bankroll(
                                         resultado_apuesta="void",
                                         monto_apostado=rec.get('stake_abs', 0),
@@ -1803,7 +1790,7 @@ elif menu == "📊 Historial":
             apuestas_ganadas = len(df_historial[df_historial['resultado'] == 'ganada'])
             st.metric("Apuestas Ganadas", apuestas_ganadas)
         
-        with col3:
+        with col_br3:
             tasa_acierto = (apuestas_ganadas / total_apuestas * 100) if total_apuestas > 0 else 0
             st.metric("Tasa de Acierto", f"{tasa_acierto:.1f}%")
         
