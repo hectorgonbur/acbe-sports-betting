@@ -559,7 +559,7 @@ def importar_estado_json(json_data):
 # Sidebar navigation
 menu = st.sidebar.selectbox(
     "Navegación",
-    ["🏠 App Principal", "🎓 Guía Interactiva", "📊 Historial"],
+    ["🏠 App Principal", "📊 Historial"],
     key="nav_menu"
 )
 
@@ -577,15 +577,15 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("⚙️ CONFIGURACIÓN DEL SISTEMA")
     
-    # BANKROLL EDITABLE - CON KEY ÚNICO Y DIRECTA VINCULACIÓN
+    # BANKROLL EDITABLE - CON KEY ÚNICO
     st.sidebar.subheader("💰 GESTIÓN DE CAPITAL")
     
-    st.sidebar.number_input(
+    bankroll_actual = st.sidebar.number_input(
         "Bankroll Actual (€)",
         min_value=0.0,
         value=float(st.session_state.bankroll_actual),
         step=50.0,
-        key="bankroll_actual"  # <--- CRÍTICO: Key directa a session_state
+        key="bankroll_actual"  # <--- CRÍTICO: Key exacta para sincronización bidireccional
     )
     
     # BACKUP/IMPORT JSON
@@ -678,6 +678,59 @@ if menu == "🏠 App Principal":
         
     liga = st.sidebar.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"], 
                                key="liga_selector_sidebar")
+    
+    # ============================================
+    # DEPÓSITOS Y RETIROS
+    # ============================================
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📥 DEPÓSITOS / RETIROS")
+    
+    col_dep1, col_dep2 = st.sidebar.columns(2)
+    
+    with col_dep1:
+        deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0)
+        if st.sidebar.button("📥 Depositar", use_container_width=True):
+            if deposito > 0:
+                st.session_state.bankroll_actual += deposito
+                
+                if 'historial_bankroll' not in st.session_state:
+                    st.session_state.historial_bankroll = []
+                
+                registro = {
+                    'timestamp': datetime.now(),
+                    'operacion': 'deposito',
+                    'monto': deposito,
+                    'detalle': "Depósito manual",
+                    'bankroll_final': st.session_state.bankroll_actual
+                }
+                st.session_state.historial_bankroll.append(registro)
+                
+                st.sidebar.success(f"✅ Depositados €{deposito:.2f}")
+                st.rerun()
+    
+    with col_dep2:
+        retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0)
+        if st.sidebar.button("📤 Retirar", use_container_width=True):
+            if retiro > 0 and retiro <= st.session_state.bankroll_actual:
+                st.session_state.bankroll_actual -= retiro
+                
+                if 'historial_bankroll' not in st.session_state:
+                    st.session_state.historial_bankroll = []
+                
+                registro = {
+                    'timestamp': datetime.now(),
+                    'operacion': 'retiro',
+                    'monto': -retiro,
+                    'detalle': "Retiro manual",
+                    'bankroll_final': st.session_state.bankroll_actual
+                }
+                st.session_state.historial_bankroll.append(registro)
+                
+                st.sidebar.success(f"✅ Retirados €{retiro:.2f}")
+                st.rerun()
+            elif retiro > st.session_state.bankroll_actual:
+                st.sidebar.error("❌ No tienes suficiente bankroll")
     
     # ============================================
     # PANEL PRINCIPAL: DATOS DETALLADOS - TODOS LOS INPUTS CON WIDGETS
@@ -1377,60 +1430,6 @@ if menu == "🏠 App Principal":
         )
     
     # ============================================
-    # DEPÓSITOS Y RETIROS (CONEXIÓN DIRECTA A SESSION_STATE)
-    # ============================================
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📥 DEPÓSITOS / RETIROS")
-    
-    col_dep1, col_dep2 = st.sidebar.columns(2)
-    
-    with col_dep1:
-        deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0)
-        if st.sidebar.button("📥 Depositar", use_container_width=True):
-            # Modificar directamente session_state.bankroll_actual
-            st.session_state.bankroll_actual += deposito
-            
-            if 'historial_bankroll' not in st.session_state:
-                st.session_state.historial_bankroll = []
-            
-            registro = {
-                'timestamp': datetime.now(),
-                'operacion': 'deposito',
-                'monto': deposito,
-                'detalle': "Depósito manual",
-                'bankroll_final': st.session_state.bankroll_actual
-            }
-            st.session_state.historial_bankroll.append(registro)
-            
-            st.sidebar.success(f"✅ Depositados €{deposito:.2f}")
-            st.rerun()
-    
-    with col_dep2:
-        retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0)
-        if st.sidebar.button("📤 Retirar", use_container_width=True):
-            if retiro <= st.session_state.bankroll_actual:
-                # Modificar directamente session_state.bankroll_actual
-                st.session_state.bankroll_actual -= retiro
-                
-                if 'historial_bankroll' not in st.session_state:
-                    st.session_state.historial_bankroll = []
-                
-                registro = {
-                    'timestamp': datetime.now(),
-                    'operacion': 'retiro',
-                    'monto': -retiro,
-                    'detalle': "Retiro manual",
-                    'bankroll_final': st.session_state.bankroll_actual
-                }
-                st.session_state.historial_bankroll.append(registro)
-                
-                st.sidebar.success(f"✅ Retirados €{retiro:.2f}")
-            else:
-                st.sidebar.error("❌ No tienes suficiente bankroll")
-            st.rerun()
-    
-    # ============================================
     # PIE DE PÁGINA PROFESIONAL
     # ============================================
     
@@ -1451,323 +1450,6 @@ if menu == "🏠 App Principal":
     
     st.markdown("---")
     st.caption("© 2024 ACBE Predictive Systems | Para uso educativo y profesional. Apuestas conllevan riesgo de pérdida.")
-
-# ============================================
-# GUÍA INTERACTIVA
-# ============================================
-
-elif menu == "🎓 Guía Interactiva":
-    st.title("🎓 Guía Interactiva: Sistema ACBE-Kelly v3.0")
-    st.markdown("---")
-    
-    st.sidebar.title("📚 ÍNDICE DE LA GUÍA")
-    
-    modulo = st.sidebar.radio(
-        "Selecciona un módulo:",
-        ["🏠 Introducción", 
-         "🧮 Fase 1: Modelo Bayesiano", 
-         "🎲 Fase 2: Monte Carlo",
-         "💰 Fase 3: Gestión de Capital",
-         "📊 Fase 4: Backtesting",
-         "🎯 Ejemplo Práctico",
-         "📈 Simulador Interactivo"]
-    )
-    
-    st.sidebar.markdown("---")
-    st.sidebar.info("**Nivel:** Intermedio\n**Tiempo:** 30-40 minutos\n**Requisitos:** Ninguno")
-    
-    if modulo == "🏠 Introducción":
-        st.header("🎯 ¿Qué es el Sistema ACBE-Kelly?")
-        
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.markdown("""
-            ### 🌟 **Sistema de Trading Deportivo Inteligente**
-            
-            **ACBE-Kelly** combina:
-            1. **A**nalítica Bayesiana
-            2. **C**álculo de Value
-            3. **B**ankroll Management
-            4. **E**valuación de Riesgo
-            
-            ### 🎯 **Objetivo Principal:**
-            > "Detectar ineficiencias del mercado donde **nuestra probabilidad > probabilidad del mercado**"
-            
-            ### 📊 **Resultados Esperados:**
-            - **Precisión:** 58-65%
-            - **ROI Anual:** 12-18%
-            - **Máxima Caída:** < 20%
-            """)
-        
-        with col2:
-            st.image("https://via.placeholder.com/300x200/2E86AB/FFFFFF?text=Sistema+ACBE", 
-                    caption="Arquitectura del Sistema")
-        
-        st.markdown("---")
-        
-        # Quiz interactivo 1
-        st.subheader("🧠 Verifica tu comprensión")
-        
-        with st.expander("❓ Pregunta 1: ¿Qué significa 'Value' en apuestas?", expanded=False):
-            opcion = st.radio(
-                "Elige la respuesta correcta:",
-                ["A) Cuánto dinero ganas en una apuesta",
-                 "B) Cuando tu probabilidad es mayor que la del mercado",
-                 "C) El margen de la casa de apuestas"],
-                key="quiz1"
-            )
-            
-            if st.button("Verificar respuesta", key="btn_quiz1"):
-                if opcion == "B) Cuando tu probabilidad es mayor que la del mercado":
-                    st.success("✅ ¡Correcto! Value = Nuestra ventaja probabilística")
-                else:
-                    st.error("❌ Incorrecto. Value ocurre cuando nuestro modelo estima una probabilidad MAYOR que la implícita en las cuotas.")
-        
-        # Ejemplo visual de value
-        st.markdown("---")
-        st.subheader("📈 Ejemplo Visual de Value")
-        
-        col_v1, col_v2, col_v3 = st.columns(3)
-        
-        with col_v1:
-            prob_modelo = st.slider("Probabilidad del Modelo (%)", 30, 70, 45, key="prob_modelo_guia")
-        
-        with col_v2:
-            cuota = st.slider("Cuota de la Casa", 1.5, 4.0, 2.5, key="cuota_guia")
-        
-        with col_v3:
-            prob_mercado = 1/cuota
-            st.metric("Prob. Mercado", f"{prob_mercado:.1%}")
-        
-        # Calcular value
-        value = (prob_modelo/100 * cuota) - 1
-        color = "green" if value > 0 else "red"
-        
-        st.markdown(f"""
-        ### 📊 Resultado:
-        - **Modelo:** {prob_modelo}%
-        - **Mercado:** {prob_mercado:.1%}
-        - **Diferencia:** {prob_modelo/100 - prob_mercado:+.1%}
-        - **Value (EV):** <span style='color:{color}'>{value:+.1%}</span>
-        """, unsafe_allow_html=True)
-        
-        if value > 0.03:
-            st.success("🎯 ¡OPORTUNIDAD DETECTADA! Value > 3%")
-        else:
-            st.warning("⚠️ No hay value suficiente")
-    
-    elif modulo == "🧮 Fase 1: Modelo Bayesiano":
-        st.header("🧮 Fase 1: Modelo Bayesiano Jerárquico")
-        
-        st.markdown("""
-        ### 🧠 ¿Qué es el aprendizaje bayesiano?
-        
-        **Piensa así:** Tienes una creencia inicial (prior), ves nuevos datos, y actualizas tu creencia.
-        
-        ```
-        Creencia Final = Creencia Inicial × Evidencia
-        ```
-        """)
-        
-        # Ejemplo interactivo
-        st.subheader("🎯 Ejemplo: Goleador de un equipo")
-        
-        col_b1, col_b2, col_b3 = st.columns(3)
-        
-        with col_b1:
-            st.markdown("**📊 Prior (Histórico)**")
-            media_historica = st.slider("Goles promedio histórico", 0.5, 2.0, 1.2, key="media_historica")
-            st.metric("Prior λ", f"{media_historica:.2f}")
-        
-        with col_b2:
-            st.markdown("**⚽ Datos Actuales**")
-            goles_recientes = st.slider("Goles últimos 5 partidos", 0, 10, 8, key="goles_recientes")
-            partidos = 5
-            media_reciente = goles_recientes / partidos
-            st.metric("Media reciente", f"{media_reciente:.2f}")
-        
-        with col_b3:
-            st.markdown("**🎯 Posterior (Actualizado)**")
-            peso_prior = st.slider("Confianza en histórico", 0.1, 0.9, 0.5, key="peso_prior")
-            peso_datos = 1 - peso_prior
-            
-            posterior = (media_historica * peso_prior) + (media_reciente * peso_datos)
-            st.metric("λ Posterior", f"{posterior:.2f}")
-        
-        # Gráfico de actualización
-        st.markdown("---")
-        st.subheader("📈 Visualización de la Actualización Bayesiana")
-        
-        # Crear distribución
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        # Prior (distribución inicial)
-        x = np.linspace(0, 3, 100)
-        prior_dist = stats.gamma.pdf(x, a=2, scale=0.6)
-        ax.plot(x, prior_dist, 'b-', label='Prior (histórico)', linewidth=2)
-        
-        # Likelihood (datos observados)
-        likelihood_dist = stats.norm.pdf(x, loc=media_reciente, scale=0.3)
-        ax.plot(x, likelihood_dist, 'r--', label='Likelihood (datos)', linewidth=2)
-        
-        # Posterior (combinación)
-        posterior_dist = stats.gamma.pdf(x, a=2 + goles_recientes, scale=0.5)
-        ax.plot(x, posterior_dist, 'g-', label='Posterior (actualizado)', linewidth=3)
-        
-        ax.set_xlabel('Goles esperados por partido (λ)')
-        ax.set_ylabel('Densidad de probabilidad')
-        ax.set_title('Actualización Bayesiana: Prior → Likelihood → Posterior')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        st.pyplot(fig)
-        
-        # Explicación
-        with st.expander("📖 Explicación del gráfico", expanded=True):
-            st.markdown("""
-            1. **🔵 Línea Azul (Prior):** Lo que creíamos ANTES de ver los datos
-            2. **🔴 Línea Roja (Likelihood):** Lo que dicen los datos ACTUALES
-            3. **🟢 Línea Verde (Posterior):** Lo que creemos AHORA (combinación)
-            
-            **📌 Insight:** Cuantos más datos tengas, más se inclina hacia la línea roja.
-            """)
-        
-        # Quiz bayesiano
-        st.markdown("---")
-        st.subheader("🧪 Prueba tu comprensión")
-        
-        pregunta = st.radio(
-            "Si un equipo históricamente marca 1.0 gol/partido, pero en los últimos 5 marca 2.0, ¿qué λ usarías?",
-            ["A) 1.0 (solo histórico)",
-             "B) 2.0 (solo reciente)", 
-             "C) Algo entre 1.0 y 2.0 (combinación)",
-             "D) 0.5 (más conservador)"],
-            key="quiz_bayes"
-        )
-        
-        if st.button("Ver respuesta", key="btn_quiz_bayes"):
-            if pregunta == "C) Algo entre 1.0 y 2.0 (combinación)":
-                st.success("✅ ¡Exacto! El bayesiano encuentra un balance entre histórico y reciente.")
-            else:
-                st.error("❌ Recuerda: Bayesiano combina información, no descarta ninguna.")
-    
-    elif modulo == "🎲 Fase 2: Monte Carlo":
-        st.header("🎲 Fase 2: Simulación Monte Carlo")
-        
-        st.markdown("### 🎯 Simular miles de partidos")
-        
-        col_m1, col_m2 = st.columns(2)
-        
-        with col_m1:
-            lambda_local = st.slider("λ Local", 0.5, 3.0, 1.5, key="lambda_local")
-        
-        with col_m2:
-            lambda_visit = st.slider("λ Visitante", 0.5, 3.0, 1.2, key="lambda_visit")
-        
-        if st.button("🎲 Ejecutar 1000 simulaciones", key="btn_montecarlo"):
-            resultados = []
-            for _ in range(1000):
-                goles_local = np.random.poisson(lambda_local)
-                goles_visit = np.random.poisson(lambda_visit)
-                
-                if goles_local > goles_visit:
-                    resultados.append("1")
-                elif goles_local == goles_visit:
-                    resultados.append("X")
-                else:
-                    resultados.append("2")
-            
-            p1 = resultados.count("1") / 1000
-            px = resultados.count("X") / 1000
-            p2 = resultados.count("2") / 1000
-            
-            st.success(f"**Resultados:** Local: {p1:.1%} | Empate: {px:.1%} | Visitante: {p2:.1%}")
-    
-    elif modulo == "💰 Fase 3: Gestión de Capital":
-        st.header("💰 Fase 3: Gestión de Capital (Kelly Criterio)")
-        
-        col_k1, col_k2 = st.columns(2)
-        
-        with col_k1:
-            prob = st.slider("Probabilidad (%)", 30, 70, 45, key="prob_kelly") / 100
-        
-        with col_k2:
-            cuota = st.slider("Cuota", 1.5, 4.0, 2.5, key="cuota_kelly")
-            b = cuota - 1
-        
-        if b > 0:
-            kelly_base = (prob * b - (1 - prob)) / b
-            kelly_final = kelly_base * 0.5  # Half-Kelly
-        else:
-            kelly_final = 0
-        
-        st.info(f"**Stake recomendado:** {kelly_final:.1%} del bankroll")
-    
-    elif modulo == "📊 Fase 4: Backtesting":
-        st.header("📊 Fase 4: Backtesting Sintético")
-        
-        if st.button("📊 Simular 100 apuestas", key="btn_backtest"):
-            bankroll = 1000
-            historial = [bankroll]
-            
-            for i in range(100):
-                stake = bankroll * 0.02  # 2% por apuesta
-                
-                if np.random.random() < 0.55:  # 55% de acierto
-                    bankroll += stake * 1.2  # Ganancia del 20%
-                else:
-                    bankroll -= stake
-                
-                historial.append(bankroll)
-            
-            roi = ((bankroll - 1000) / 1000) * 100
-            st.metric("Bankroll Final", f"€{bankroll:.0f}")
-            st.metric("ROI", f"{roi:.1f}%")
-    
-    elif modulo == "🎯 Ejemplo Práctico":
-        st.header("🎯 Ejemplo Práctico: Bologna vs AC Milan")
-        
-        st.markdown("""
-        **Análisis completo:**
-        - 📊 **Modelo:** 45% probabilidad de victoria local
-        - 💰 **Mercado:** 34% probabilidad implícita (cuota 2.90)
-        - 🎯 **Value:** +14.5% (oportunidad clara)
-        - 🏦 **Stake:** 3.8% del bankroll (Half-Kelly)
-        
-        **✅ RECOMENDACIÓN: APOSTAR**
-        """)
-    
-    elif modulo == "📈 Simulador Interactivo":
-        st.header("📈 Simulador Interactivo")
-        
-        prob = st.slider("Tu estimación (%)", 30, 70, 45, key="prob_simulador")
-        cuota = st.slider("Cuota ofrecida", 1.5, 4.0, 2.5, key="cuota_simulador")
-        
-        ev = (prob/100 * cuota) - 1
-        
-        if ev > 0.03:
-            st.success(f"🎯 **APOSTAR** - Value = {ev:+.1%}")
-        elif ev > 0:
-            st.info(f"📊 **Considerar** - Value = {ev:+.1%}")
-        else:
-            st.warning(f"⚠️ **NO APOSTAR** - Value = {ev:+.1%}")
-    
-    # ============ PIE DE PÁGINA ============
-    st.markdown("---")
-    st.markdown("""
-    ### 🎓 **Has completado la Guía Interactiva ACBE-Kelly**
-
-    **Siguientes pasos recomendados:**
-    1. **Practica** con el simulador hasta sentirte cómodo
-    2. **Analiza** partidos reales sin dinero
-    3. **Comienza** con paper trading
-    4. **Implementa** con bankroll pequeño cuando tengas confianza
-
-    **Recuerda:** El éxito viene de la **consistencia** y **gestión de riesgo**, no de adivinar resultados.
-    """)
-    
-    st.caption("© 2024 ACBE Predictive Systems | Guía educativa para aprendizaje interactivo")
 
 # ============================================
 # HISTORIAL
@@ -1791,7 +1473,7 @@ elif menu == "📊 Historial":
             apuestas_ganadas = len(df_historial[df_historial['resultado'] == 'ganada'])
             st.metric("Apuestas Ganadas", apuestas_ganadas)
         
-        with col_br3:
+        with col3:
             tasa_acierto = (apuestas_ganadas / total_apuestas * 100) if total_apuestas > 0 else 0
             st.metric("Tasa de Acierto", f"{tasa_acierto:.1f}%")
         
