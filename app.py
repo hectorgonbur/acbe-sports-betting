@@ -577,7 +577,7 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("⚙️ CONFIGURACIÓN DEL SISTEMA")
     
-    # BANKROLL EDITABLE
+    # BANKROLL EDITABLE - CON KEY ÚNICO
     st.sidebar.subheader("💰 GESTIÓN DE CAPITAL")
     
     bankroll_actual = st.sidebar.number_input(
@@ -585,7 +585,7 @@ if menu == "🏠 App Principal":
         min_value=0.0,
         value=float(st.session_state.bankroll_actual),
         step=50.0,
-        key="bankroll_input"
+        key="bankroll_widget"
     )
     st.session_state.bankroll_actual = bankroll_actual
     
@@ -681,12 +681,19 @@ if menu == "🏠 App Principal":
                                key="liga_selector_sidebar")
     
     # ============================================
-    # PANEL PRINCIPAL: DATOS DETALLADOS
+    # PANEL PRINCIPAL: DATOS DETALLADOS - TODOS LOS INPUTS CON WIDGETS
     # ============================================
     
     st.header("📈 ANÁLISIS DE EQUIPOS")
     
     col_team1, col_team2 = st.columns(2)
+    
+    # Variables para almacenar los valores de los widgets
+    g_h_ult5 = g_h_ult10 = xg_h_prom = tiros_arco_h = posesion_h = precision_pases_h = None
+    goles_rec_h = xg_contra_h = entradas_h = recuperaciones_h = delta_h = motivacion_h = carga_fisica_h = None
+    
+    g_a_ult5 = g_a_ult10 = xg_a_prom = tiros_arco_a = posesion_a = precision_pases_a = None
+    goles_rec_a = xg_contra_a = entradas_a = recuperaciones_a = delta_a = motivacion_a = carga_fisica_a = None
     
     with col_team1:
         st.subheader(f"🏠 {team_h} (Local)")
@@ -728,8 +735,7 @@ if menu == "🏠 App Principal":
             with col_o2:
                 g_a_ult10 = st.number_input(f"Goles (últ. 10p)", value=12, min_value=0, key="ga10")
                 # Calculamos posesión visitante como complemento
-                posesion_h_val = st.session_state.get('pos_h', 52)
-                posesion_a = 100 - posesion_h_val
+                posesion_a = 100 - posesion_h
                 st.metric("Posesión %", f"{posesion_a}%")
                 precision_pases_a = st.slider("Precisión pases %", 70, 90, 78, key="ppa")
         
@@ -764,7 +770,7 @@ if menu == "🏠 App Principal":
                 # FASE 1: INFERENCIA VARIACIONAL
                 # ============================================
                 with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
-                    # Obtener inputs (40+ variables)
+                    # Obtener inputs de los widgets
                     datos = {
                         'team_h': team_h, 'team_a': team_a,
                         'g_h_ult5': g_h_ult5, 'g_h_ult10': g_h_ult10,
@@ -1225,85 +1231,87 @@ if menu == "🏠 App Principal":
                 if stake_total > bankroll * 0.25:
                     st.warning("⚠️ **ALERTA:** Estás apostando más del 25% de tu bankroll. Considera reducir stakes.")
                 
-                # Mostrar cada recomendación
+                # Mostrar cada recomendación - SIEMPRE VISIBLE
                 for i, rec in enumerate(recomendaciones):
-                    if rec.get("kelly_pct", 0) > 0:
-                        with st.expander(
-                            f"🎯 **RECOMENDACIÓN {i+1}: {rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
-                            expanded=True
-                        ):
-                            # Fila 1: Métricas
-                            col_met1, col_met2, col_met3, col_met4 = st.columns(4)
-                            
-                            with col_met1:
-                                st.metric("💰 Stake", f"€{rec['stake_abs']:.0f}")
-                                st.caption(f"{rec['kelly_pct']:.2f}% bankroll")
-                            
-                            with col_met2:
-                                st.metric("🎯 EV", f"{rec['ev']}")
-                                st.caption("Valor Esperado")
-                            
-                            with col_met3:
-                                st.metric("⚠️ CVaR", f"{rec['cvar']:.2%}")
-                                st.caption("Riesgo de cola")
-                            
-                            with col_met4:
-                                st.metric("📈 Sharpe", f"{rec['sharpe_esperado']:.2f}")
-                                st.caption("Ratio riesgo/retorno")
-                            
-                            # Fila 2: BOTONES DE ACCIÓN
-                            st.markdown("---")
-                            st.subheader("📝 REGISTRAR RESULTADO")
-                            
-                            col_btn1, col_btn2, col_btn3 = st.columns(3)
-                            
-                            with col_btn1:
-                                if st.button(f"✅ GANADA", key=f"win_{i}_{uuid.uuid4()}", 
-                                          type="primary", use_container_width=True):
-                                    ganancia = rec.get('stake_abs', 0) * (rec.get('cuota_numerico', 2.0) - 1)
-                                    resultado = actualizar_bankroll(
-                                        resultado_apuesta="ganada",
-                                        monto_apostado=rec.get('stake_abs', 0),
-                                        cuota=rec.get('cuota_numerico', 2.0),
-                                        pick=rec['resultado'],
-                                        descripcion=f"Apuesta {rec['resultado']} ganada"
-                                    )
-                                    st.success(f"✅ Ganancia registrada: €{ganancia:.2f}")
-                                    st.rerun()
-                            
-                            with col_btn2:
-                                if st.button(f"❌ PERDIDA", key=f"loss_{i}_{uuid.uuid4()}", 
-                                          type="secondary", use_container_width=True):
-                                    resultado = actualizar_bankroll(
-                                        resultado_apuesta="perdida",
-                                        monto_apostado=rec.get('stake_abs', 0),
-                                        pick=rec['resultado'],
-                                        descripcion=f"Apuesta {rec['resultado']} perdida"
-                                    )
-                                    st.error(f"❌ Pérdida registrada: €{rec.get('stake_abs', 0):.2f}")
-                                    st.rerun()
-                            
-                            with col_btn3:
-                                if st.button(f"🔄 VOID", key=f"void_{i}_{uuid.uuid4()}", 
-                                          type="secondary", use_container_width=True):
-                                    resultado = actualizar_bankroll(
-                                        resultado_apuesta="void",
-                                        monto_apostado=rec.get('stake_abs', 0),
-                                        pick=rec['resultado'],
-                                        descripcion=f"Apuesta {rec['resultado']} anulada"
-                                    )
-                                    st.info("💰 Apuesta anulada - Stake devuelto")
-                                    st.rerun()
-                            
-                            # Información adicional
-                            with st.expander("📊 Métricas detalladas", expanded=False):
-                                col_det1, col_det2 = st.columns(2)
-                                with col_det1:
-                                    st.metric("🎯 Prob. Profit", f"{rec['prob_profit']:.1%}")
-                                    st.metric("📉 Max DD Esperado", f"{rec['max_dd_promedio']:.1%}")
-                                with col_det2:
-                                    st.metric("📊 Kelly Base", f"{rec.get('kelly_base', 0):.2f}%" if 'kelly_base' in rec else "N/A")
-                                    st.caption(f"**Razón:** {rec.get('razon_kelly', 'Sin información')}")
+                    # Mostrar siempre, sin condiciones sobre stake > 0
+                    with st.expander(
+                        f"🎯 **RECOMENDACIÓN {i+1}: {rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
+                        expanded=True
+                    ):
+                        # Fila 1: Métricas
+                        col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+                        
+                        with col_met1:
+                            st.metric("💰 Stake", f"€{rec['stake_abs']:.0f}")
+                            st.caption(f"{rec['kelly_pct']:.2f}% bankroll")
+                        
+                        with col_met2:
+                            st.metric("🎯 EV", f"{rec['ev']}")
+                            st.caption("Valor Esperado")
+                        
+                        with col_met3:
+                            st.metric("⚠️ CVaR", f"{rec['cvar']:.2%}")
+                            st.caption("Riesgo de cola")
+                        
+                        with col_met4:
+                            st.metric("📈 Sharpe", f"{rec['sharpe_esperado']:.2f}")
+                            st.caption("Ratio riesgo/retorno")
+                        
+                        # Fila 2: BOTONES DE ACCIÓN - EN 3 COLUMNAS SEPARADAS
+                        st.markdown("---")
+                        st.subheader("📝 REGISTRAR RESULTADO")
+                        
+                        col_btn1, col_btn2, col_btn3 = st.columns(3)
+                        
+                        with col_btn1:
+                            if st.button(f"✅ GANADA", key=f"win_{i}_{uuid.uuid4()}", 
+                                      type="primary", use_container_width=True):
+                                ganancia = rec.get('stake_abs', 0) * (rec.get('cuota_numerico', 2.0) - 1)
+                                resultado = actualizar_bankroll(
+                                    resultado_apuesta="ganada",
+                                    monto_apostado=rec.get('stake_abs', 0),
+                                    cuota=rec.get('cuota_numerico', 2.0),
+                                    pick=rec['resultado'],
+                                    descripcion=f"Apuesta {rec['resultado']} ganada"
+                                )
+                                st.session_state.bankroll_actual += ganancia
+                                st.success(f"✅ Ganancia registrada: €{ganancia:.2f}")
+                                st.rerun()
+                        
+                        with col_btn2:
+                            if st.button(f"❌ PERDIDA", key=f"loss_{i}_{uuid.uuid4()}", 
+                                      type="secondary", use_container_width=True):
+                                resultado = actualizar_bankroll(
+                                    resultado_apuesta="perdida",
+                                    monto_apostado=rec.get('stake_abs', 0),
+                                    pick=rec['resultado'],
+                                    descripcion=f"Apuesta {rec['resultado']} perdida"
+                                )
+                                st.session_state.bankroll_actual -= rec.get('stake_abs', 0)
+                                st.error(f"❌ Pérdida registrada: €{rec.get('stake_abs', 0):.2f}")
+                                st.rerun()
+                        
+                        with col_btn3:
+                            if st.button(f"🔄 VOID", key=f"void_{i}_{uuid.uuid4()}", 
+                                      type="secondary", use_container_width=True):
+                                resultado = actualizar_bankroll(
+                                    resultado_apuesta="void",
+                                    monto_apostado=rec.get('stake_abs', 0),
+                                    pick=rec['resultado'],
+                                    descripcion=f"Apuesta {rec['resultado']} anulada"
+                                )
+                                st.info("💰 Apuesta anulada - Stake devuelto")
+                                st.rerun()
+                        
+                        # Información adicional
+                        with st.expander("📊 Métricas detalladas", expanded=False):
+                            col_det1, col_det2 = st.columns(2)
+                            with col_det1:
+                                st.metric("🎯 Prob. Profit", f"{rec['prob_profit']:.1%}")
+                                st.metric("📉 Max DD Esperado", f"{rec['max_dd_promedio']:.1%}")
+                            with col_det2:
+                                st.metric("📊 Kelly Base", f"{rec.get('kelly_base', 0):.2f}%" if 'kelly_base' in rec else "N/A")
+                                st.caption(f"**Razón:** {rec.get('razon_kelly', 'Sin información')}")
         
         # ============ FASE 5: MÉTRICAS DE PERFORMANCE ============
         if 'fase5' in dm:
