@@ -733,6 +733,19 @@ elif menu == "🏠 App Principal":
                 # Kelly base debe estar entre 0 y 0.5 (50% máximo)
                 kelly_base = max(0, min(kelly_base, 0.5))
                 
+                # ============ AQUÍ PEGAS LA CORRECCIÓN ============
+                # Extraer y limitar el CVaR para evitar valores ilógicos (como 110%)
+                cvar_actual = float(metrics.get("cvar_estimado", 0.15))
+                cvar_actual = min(1.0, max(0.0, cvar_actual)) # CAP de seguridad entre 0 y 100%
+                
+                if cvar_actual >= 1.0:
+                    return {
+                        "stake_pct": 0.0, 
+                        "stake_abs": 0.0, 
+                        "razon": "🚫 EVASIÓN: Riesgo de cola inaceptable (100%+)"
+                    }
+                # =================================================
+                
                 # ============ AJUSTES ALINEADOS CON OBJETIVOS ============
                 incertidumbre = float(metrics.get("incertidumbre", 0.5))
                 cvar_actual = float(metrics.get("cvar_estimado", 0.15))
@@ -851,40 +864,42 @@ elif menu == "🏠 App Principal":
                 var = np.percentile(ganancias, percentil)
                 
                 # 4. Calcular CVaR (Conditional Value at Risk)
-                # Promedio de las pérdidas que están POR DEBAJO del VaR
                 perdidas_extremas = ganancias[ganancias <= var]
                 
                 if len(perdidas_extremas) > 0:
                     cvar = abs(perdidas_extremas.mean())
                 else:
-                    cvar = 0.0  # No hay pérdidas extremas
+                    cvar = abs(var) if var < 0 else 0.0
                 
-                # 5. LIMITAR CVaR a valores RAZONABLES (máximo 50%)
-                cvar = min(cvar, 0.50)
+                # ============ CORRECCIÓN PROFESIONAL: NORMALIZACIÓN CRÍTICA ============
+                # A) El CVaR siempre debe ser >= VaR (lógica de colas)
+                if var < 0:
+                    cvar = max(cvar, abs(var))
                 
-                # 6. Asegurar que CVaR no sea menor que VaR (solo si VaR es negativo)
-                if var < 0:  # Solo cuando hay pérdidas
-                    var_abs = abs(var)
-                    cvar = max(cvar, var_abs * 1.1)  # CVaR debe ser > VaR
-                else:
-                    # Si VaR es positivo o cero, no hay pérdidas en el 5% peor
-                    cvar = max(cvar, 0.0)
+                # B) LÍMITE ABSOLUTO: En trading deportivo no puedes perder más del 100% (1.0)
+                # Esto elimina el error del 110% definitivamente.
+                cvar = min(cvar, 1.0) 
+                
+                # C) LÍMITE DE EXPOSICIÓN: Opcional, si quieres que el sistema sea 
+                # conservador puedes dejarlo en 0.50 como tenías, pero el límite real es 1.0
+                # cvar = min(cvar, 0.50) 
+                # =======================================================================
                 
                 # 7. Calcular otras métricas
                 esperanza = ganancias.mean()
                 desviacion = ganancias.std()
-                sharpe = esperanza / max(desviacion, 0.01)
+                sharpe = esperanza / max(desviacion, 0.001)
                 prob_perdida = np.mean(ganancias < 0)
                 max_perdida = ganancias.min()
                 
                 return {
-                    "cvar": cvar,
-                    "var": abs(var),
-                    "esperanza": esperanza,
-                    "desviacion": desviacion,
-                    "sharpe_simulado": sharpe,
-                    "max_perdida_simulada": max_perdida,
-                    "prob_perdida": prob_perdida
+                    "cvar": float(cvar),
+                    "var": float(abs(var)),
+                    "esperanza": float(esperanza),
+                    "desviacion": float(desviacion),
+                    "sharpe_simulado": float(sharpe),
+                    "max_perdida_simulada": float(max_perdida),
+                    "prob_perdida": float(prob_perdida)
                 }
                 
             except Exception as e:
@@ -1716,35 +1731,32 @@ elif menu == "🏠 App Principal":
     volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="vol_slider_v3")
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider_v3")
 
+    # 1. Forzar limpieza de or_val (Garantía de float)
+    try:
+        # Intentamos convertir a float y limpiar posibles NaNs o Strings
+        or_val_limpio = float(np.nan_to_num(or_val)) 
+    except:
+        or_val_limpio = 0.0
+    
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     
     with col_met1:
-        # Evitar completamente el formateo de porcentaje
-        try:
-            porcentaje = float(or_val) * 100
-            texto = f"{porcentaje:.2f}%"
-        except:
-            texto = "0.00%"
-            
-        # Usar delta=None para evitar problemas
-        st.metric(label="Overround", value=f"{or_val*100:.2f}%", key="metric_overround_final")  
+        # Formateamos el texto ANTES de pasarlo a st.metric
+        texto_overround = f"{or_val_limpio * 100:.2f}%"
+        st.metric(label="Overround", value=texto_overround)  
 
     with col_met2:
-        # Calcular margen de manera segura
-        try:
-            if or_val != -1:  # Evitar división por cero
-                margen_casa = (or_val / (1 + or_val)) * 100
-                margen_formateado = f"{margen_casa:.1f}%"
-            else:
-                margen_formateado = "0.0%"
-        except Exception:
-            margen_formateado = "0.0%"
-        
-        st.metric("Margen Casa", f"{margen:.1f}%", key="metric_margen_final")
+        # Cálculo seguro de margen
+        if or_val_limpio > -1:
+            margen_num = (or_val_limpio / (1 + or_val_limpio)) * 100
+        else:
+            margen_num = 0.0
+        st.metric("Margen Casa", f"{margen_num:.1f}%")
 
     with col_met3:
-        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, key="ent_slider_final")
-        st.metric("Entropía", f"{entropia_mercado:.3f}", key="metric_ent_final")
+        # Asegurar que entropía sea float
+        ent_val = float(entropia_mercado) if 'entropia_mercado' in locals() else 0.620
+        st.metric("Entropía", f"{ent_val:.3f}")
         
     if or_val > 0.07:
         st.sidebar.warning(f"⚠️ Overround Alto ({or_val:.2%}). El Stake Kelly será penalizado.")
