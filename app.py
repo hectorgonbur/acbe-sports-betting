@@ -577,17 +577,16 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("⚙️ CONFIGURACIÓN DEL SISTEMA")
     
-    # BANKROLL EDITABLE - CON KEY ÚNICO
+    # BANKROLL EDITABLE - CON KEY ÚNICO Y DIRECTA VINCULACIÓN
     st.sidebar.subheader("💰 GESTIÓN DE CAPITAL")
     
-    bankroll_actual = st.sidebar.number_input(
+    st.sidebar.number_input(
         "Bankroll Actual (€)",
         min_value=0.0,
         value=float(st.session_state.bankroll_actual),
         step=50.0,
-        key="bankroll_widget"
+        key="bankroll_actual"  # <--- CRÍTICO: Key directa a session_state
     )
-    st.session_state.bankroll_actual = bankroll_actual
     
     # BACKUP/IMPORT JSON
     st.sidebar.markdown("---")
@@ -1274,7 +1273,6 @@ if menu == "🏠 App Principal":
                                     pick=rec['resultado'],
                                     descripcion=f"Apuesta {rec['resultado']} ganada"
                                 )
-                                st.session_state.bankroll_actual += ganancia
                                 st.success(f"✅ Ganancia registrada: €{ganancia:.2f}")
                                 st.rerun()
                         
@@ -1287,7 +1285,6 @@ if menu == "🏠 App Principal":
                                     pick=rec['resultado'],
                                     descripcion=f"Apuesta {rec['resultado']} perdida"
                                 )
-                                st.session_state.bankroll_actual -= rec.get('stake_abs', 0)
                                 st.error(f"❌ Pérdida registrada: €{rec.get('stake_abs', 0):.2f}")
                                 st.rerun()
                         
@@ -1380,7 +1377,7 @@ if menu == "🏠 App Principal":
         )
     
     # ============================================
-    # DEPÓSITOS Y RETIROS
+    # DEPÓSITOS Y RETIROS (CONEXIÓN DIRECTA A SESSION_STATE)
     # ============================================
     
     st.sidebar.markdown("---")
@@ -1391,9 +1388,7 @@ if menu == "🏠 App Principal":
     with col_dep1:
         deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0)
         if st.sidebar.button("📥 Depositar", use_container_width=True):
-            if 'bankroll_actual' not in st.session_state:
-                st.session_state.bankroll_actual = 1000.0
-            
+            # Modificar directamente session_state.bankroll_actual
             st.session_state.bankroll_actual += deposito
             
             if 'historial_bankroll' not in st.session_state:
@@ -1414,10 +1409,8 @@ if menu == "🏠 App Principal":
     with col_dep2:
         retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0)
         if st.sidebar.button("📤 Retirar", use_container_width=True):
-            if 'bankroll_actual' not in st.session_state:
-                st.session_state.bankroll_actual = 1000.0
-            
             if retiro <= st.session_state.bankroll_actual:
+                # Modificar directamente session_state.bankroll_actual
                 st.session_state.bankroll_actual -= retiro
                 
                 if 'historial_bankroll' not in st.session_state:
