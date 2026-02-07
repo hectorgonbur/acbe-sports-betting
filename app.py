@@ -1900,10 +1900,17 @@ elif menu == "🏠 App Principal":
             detector = DetectorIneficiencias()
             gestor_riesgo = GestorRiscoCVaR(cvar_target=cvar_target, max_drawdown=max_dd)
             backtester = BacktestSintetico()
+            
+        # === CORRECCIÓN A: ACTIVADOR DE MEMORIA ===
+        st.session_state['analisis_ejecutado'] = True
+        st.session_state['mostrar_resultados'] = True
+        st.success("✅ Motor Cuántico Inicializado")
+        st.rerun() # <--- OBLIGATORIO para que aparezca todo al instante
     
     # En la barra lateral, después del botón de ejecutar análisis:
     st.sidebar.markdown("---")
-
+    
+    # Si el análisis se ejecutó, mostramos las 2000 líneas de resultados
     if st.session_state.get('analisis_ejecutado', False):
         if st.sidebar.button("🔄 Re-ejecutar último análisis", type="secondary"):
             # Cargar parámetros guardados
@@ -1952,51 +1959,52 @@ elif menu == "🏠 App Principal":
                 st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
         
         with st.spinner("🧠 EJECUTANDO INFERENCIA BAYESIANA..."):
-            st.subheader("🎯 FASE 1: INFERENCIA BAYESIANA")
-            
-            # Preparar datos para el modelo
+            # 1. Preparación de diccionarios
             datos_local = {
-                "goles_anotados": g_h_ult10,
-                "goles_recibidos": goles_rec_h,
-                "n_partidos": 10,
-                "xG": xg_h_prom,
-                "tiros_arco": tiros_arco_h,
-                "posesion": posesion_h,
-                "precision_pases": precision_pases_h
+                "goles_anotados": g_h_ult10, "goles_recibidos": goles_rec_h,
+                "n_partidos": 10, "xG": xg_h_prom, "tiros_arco": tiros_arco_h,
+                "posesion": posesion_h, "precision_pases": precision_pases_h
             }
-            
             datos_visitante = {
-                "goles_anotados": g_a_ult10,
-                "goles_recibidos": goles_rec_a,
-                "n_partidos": 10,
-                "xG": xg_a_prom,
-                "tiros_arco": tiros_arco_a,
-                "posesion": posesion_a,
-                "precision_pases": precision_pases_a
+                "goles_anotados": g_a_ult10, "goles_recibidos": goles_rec_a,
+                "n_partidos": 10, "xG": xg_a_prom, "tiros_arco": tiros_arco_a,
+                "posesion": posesion_a, "precision_pases": precision_pases_a
             }
             
-            # Inferencia bayesiana
-            posterior_local = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
-            posterior_visitante = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
+            # 2. Inferencia (Cálculo puro)
+            post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
+            post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
             
-            # Aplicar ajustes por factores de riesgo
-            lambda_h_ajustado = posterior_local["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
-            lambda_a_ajustado = posterior_visitante["lambda"] * (1 - delta_a) * motivacion_a / carga_fisica_a
+            # 3. Ajustes de Riesgo
+            l_h_adj = post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
+            l_a_adj = post_a["lambda"] * (1 - delta_a) * motivacion_a / carga_fisica_a
+
+            # 4. GUARDADO EN LA MALETA (Vital para que no se borre)
+            st.session_state['datos_fase1'] = {
+                'team_h': team_h, 'team_a': team_a,
+                'l_h': l_h_adj, 'l_a': l_a_adj,
+                'inc_h': post_h['incertidumbre'], 'inc_a': post_a['incertidumbre'],
+                'ci_h': post_h['ci_95'], 'ci_a': post_a['ci_95']
+            }
             
-            # Mostrar resultados de inferencia
+        # === RENDERIZADO DE FASE 1 ===
+        if st.session_state.get('analisis_ejecutado', False) and 'datos_fase1' in st.session_state:
+            df1 = st.session_state['datos_fase1']
+            
+            st.subheader("🎯 FASE 1: INFERENCIA BAYESIANA")
             col_inf1, col_inf2 = st.columns(2)
             
             with col_inf1:
-                st.markdown(f"**{team_h} (Local)**")
-                st.metric("λ Posterior", f"{lambda_h_ajustado:.3f}")
-                st.metric("Incertidumbre", f"{posterior_local['incertidumbre']:.3f}")
-                st.metric("CI 95%", f"[{posterior_local['ci_95'][0]:.2f}, {posterior_local['ci_95'][1]:.2f}]")
+                st.markdown(f"**🏠 {df1['team_h']}**")
+                st.metric("λ Posterior", f"{df1['l_h']:.3f}", help="Goles esperados ajustados")
+                st.metric("Incertidumbre", f"{df1['inc_h']:.3%}")
+                st.caption(f"Intervalo Credibilidad: {df1['ci_h'][0]:.2f} - {df1['ci_h'][1]:.2f}")
             
             with col_inf2:
-                st.markdown(f"**{team_a} (Visitante)**")
-                st.metric("λ Posterior", f"{lambda_a_ajustado:.3f}")
-                st.metric("Incertidumbre", f"{posterior_visitante['incertidumbre']:.3f}")
-                st.metric("CI 95%", f"[{posterior_visitante['ci_95'][0]:.2f}, {posterior_visitante['ci_95'][1]:.2f}]")
+                st.markdown(f"**✈️ {df1['team_a']}**")
+                st.metric("λ Posterior", f"{df1['l_a']:.3f}", help="Goles esperados ajustados")
+                st.metric("Incertidumbre", f"{df1['inc_a']:.3%}")
+                st.caption(f"Intervalo Credibilidad: {df1['ci_a'][0]:.2f} - {df1['ci_a'][1]:.2f}")
         
         with st.spinner("🎲 SIMULANDO 50,000 ESCENARIOS..."):
             st.subheader("🎯 FASE 2: SIMULACIÓN MONTE CARLO AVANZADA")
@@ -2582,19 +2590,6 @@ elif menu == "🏠 App Principal":
 
             st.success("✅ Análisis completado y guardado en memoria")
             st.rerun()
-    
-        # ============ DESPUÉS DEL BOTÓN PRINCIPAL ============
-        # AQUÍ VA EL CÓDIGO QUE PREGUNTAS:
-        st.sidebar.markdown("---")
-
-        if st.session_state.get('analisis_ejecutado', False):
-            if st.sidebar.button("🔄 Re-ejecutar último análisis", type="secondary"):
-                # Cargar parámetros guardados
-                inputs = st.session_state.get('inputs_analisis', {})
-                # Aquí deberías rellenar automáticamente los inputs con los valores guardados
-                st.sidebar.success("Parámetros cargados. Presiona 'EJECUTAR ANÁLISIS COMPLETO'")
-                st.session_state['cargar_ultimo_analisis'] = True
-                st.rerun()
         
         # ============ SECCIÓN SIEMPRE VISIBLE: REGISTRO DE APUESTAS ============
         st.markdown("---")
