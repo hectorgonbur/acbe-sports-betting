@@ -1989,58 +1989,58 @@ elif menu == "🏠 App Principal":
                 
                 st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
         
-    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", key="btn_final_39k"):
-        with st.spinner("🧠 EJECUTANDO INFERENCIA BAYESIANA..."):
-            # A) CREAR EL MODELO (Importante para evitar el NameError)
-            modelo_bayes = ModeloBayesianoJerarquico(liga)
-            
-            # B) PREPARAR DATOS
-            datos_local = {
-                "goles_anotados": g_h_ult10, "goles_recibidos": goles_rec_h,
-                "n_partidos": 10, "xG": xg_h_prom, "tiros_arco": tiros_arco_h,
-                "posesion": posesion_h, "precision_pases": precision_pases_h
-            }
-            datos_visitante = {
-                "goles_anotados": g_a_ult10, "goles_recibidos": goles_rec_a,
-                "n_partidos": 10, "xG": xg_a_prom, "tiros_arco": tiros_arco_a,
-                "posesion": posesion_a, "precision_pases": precision_pases_a
-            }
-            
-            # C) CÁLCULO
-            post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
-            post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
-            
-            l_h_adj = post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
-            l_a_adj = post_a["lambda"] * (1 - delta_a) * motivacion_a / carga_fisica_a
+        if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", key="btn_final_39k"):
+            with st.spinner("🧠 EJECUTANDO INFERENCIA BAYESIANA..."):
+                # A) CREAR EL MODELO (Importante para evitar el NameError)
+                modelo_bayes = ModeloBayesianoJerarquico(liga)
+                
+                # B) PREPARAR DATOS
+                datos_local = {
+                    "goles_anotados": g_h_ult10, "goles_recibidos": goles_rec_h,
+                    "n_partidos": 10, "xG": xg_h_prom, "tiros_arco": tiros_arco_h,
+                    "posesion": posesion_h, "precision_pases": precision_pases_h
+                }
+                datos_visitante = {
+                    "goles_anotados": g_a_ult10, "goles_recibidos": goles_rec_a,
+                    "n_partidos": 10, "xG": xg_a_prom, "tiros_arco": tiros_arco_a,
+                    "posesion": posesion_a, "precision_pases": precision_pases_a
+                }
+                
+                # C) CÁLCULO
+                post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
+                post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
+                
+                l_h_adj = post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
+                l_a_adj = post_a["lambda"] * (1 - delta_a) * motivacion_a / carga_fisica_a
 
-            # D) GUARDADO EN LA MALETA (Aquí es donde evitas que se borre)
-            st.session_state['datos_fase1'] = {
-                'team_h': team_h, 'team_a': team_a,
-                'l_h': l_h_adj, 'l_a': l_a_adj,
-                'inc_h': post_h['incertidumbre'], 'inc_a': post_a['incertidumbre'],
-                'ci_h': post_h['ci_95'], 'ci_a': post_a['ci_95']
-            }
-            st.session_state['analisis_ejecutado'] = True
-            st.rerun() # Fuerza a la app a mostrar los resultados inmediatamente
-            
-    # === RENDERIZADO DE FASE 1 ===
-    if st.session_state.get('analisis_ejecutado', False) and 'datos_fase1' in st.session_state:
-        df1 = st.session_state['datos_fase1']
-            
-        st.subheader("🎯 FASE 1: INFERENCIA BAYESIANA")
-        col_inf1, col_inf2 = st.columns(2)
-            
-        with col_inf1:
-            st.markdown(f"**🏠 {df1['team_h']}**")
-            st.metric("λ Posterior", f"{df1['l_h']:.3f}", help="Goles esperados ajustados")
-            st.metric("Incertidumbre", f"{df1['inc_h']:.3%}")
-            st.caption(f"Intervalo Credibilidad: {df1['ci_h'][0]:.2f} - {df1['ci_h'][1]:.2f}")
-            
-        with col_inf2:
-            st.markdown(f"**✈️ {df1['team_a']}**")
-            st.metric("λ Posterior", f"{df1['l_a']:.3f}", help="Goles esperados ajustados")
-            st.metric("Incertidumbre", f"{df1['inc_a']:.3%}")
-            st.caption(f"Intervalo Credibilidad: {df1['ci_a'][0]:.2f} - {df1['ci_a'][1]:.2f}")    
+                # D) GUARDADO EN LA MALETA (Aquí es donde evitas que se borre)
+                st.session_state['datos_fase1'] = {
+                    'team_h': team_h, 'team_a': team_a,
+                    'l_h': l_h_adj, 'l_a': l_a_adj,
+                    'inc_h': post_h['incertidumbre'], 'inc_a': post_a['incertidumbre'],
+                    'ci_h': post_h['ci_95'], 'ci_a': post_a['ci_95']
+                }
+                st.session_state['analisis_ejecutado'] = True
+                st.rerun() # Fuerza a la app a mostrar los resultados inmediatamente
+                
+        # === RENDERIZADO DE FASE 1 ===
+        if st.session_state.get('analisis_ejecutado', False) and 'datos_fase1' in st.session_state:
+            df1 = st.session_state['datos_fase1']
+                
+            st.subheader("🎯 FASE 1: INFERENCIA BAYESIANA")
+            col_inf1, col_inf2 = st.columns(2)
+                
+            with col_inf1:
+                st.markdown(f"**🏠 {df1['team_h']}**")
+                st.metric("λ Posterior", f"{df1['l_h']:.3f}", help="Goles esperados ajustados")
+                st.metric("Incertidumbre", f"{df1['inc_h']:.3%}")
+                st.caption(f"Intervalo Credibilidad: {df1['ci_h'][0]:.2f} - {df1['ci_h'][1]:.2f}")
+                
+            with col_inf2:
+                st.markdown(f"**✈️ {df1['team_a']}**")
+                st.metric("λ Posterior", f"{df1['l_a']:.3f}", help="Goles esperados ajustados")
+                st.metric("Incertidumbre", f"{df1['inc_a']:.3%}")
+                st.caption(f"Intervalo Credibilidad: {df1['ci_a'][0]:.2f} - {df1['ci_a'][1]:.2f}")    
         
         with st.spinner("🎲 SIMULANDO 50,000 ESCENARIOS..."):
             st.subheader("🎯 FASE 2: SIMULACIÓN MONTE CARLO AVANZADA")
