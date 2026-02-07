@@ -39,10 +39,6 @@ if 'entropia_mercado' not in st.session_state:
 if 'bankroll_actual' not in st.session_state:
     st.session_state.bankroll_actual = 1000.0
 
-# Variable temporal para depósitos/retiros (SOLUCIÓN AL ERROR)
-if 'bankroll_temp' not in st.session_state:
-    st.session_state.bankroll_temp = 0.0
-
 if 'bankroll_inicial_sesion' not in st.session_state:
     st.session_state.bankroll_inicial_sesion = st.session_state.bankroll_actual
 
@@ -581,14 +577,68 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("⚙️ CONFIGURACIÓN DEL SISTEMA")
     
-    # BANKROLL EDITABLE - CON KEY ÚNICO (CORREGIDO)
-    st.sidebar.subheader("💰 GESTIÓN DE CAPITAL")
+    # --- GESTIÓN DE CAPITAL (NUEVA ESTRUCTURA HÍBRIDA) ---
+    st.sidebar.header("💰 GESTIÓN DE CAPITAL")
     
-    # Mostrar el bankroll actual como métrica en lugar de number_input editable
-    st.sidebar.metric("Bankroll Actual", f"€{st.session_state.bankroll_actual:,.2f}")
+    # 1. ZONA DE CONFIGURACIÓN (Oculta por seguridad)
+    # Permite reiniciar el bankroll a un valor fijo arbitrario (ej: nuevo usuario)
+    with st.sidebar.expander("⚙️ Configurar Capital Inicial"):
+        nuevo_inicio = st.number_input("Monto Inicial (€)", value=1000.0, step=100.0, key="input_reset_bankroll")
+        if st.button("💾 Reiniciar Bankroll", use_container_width=True):
+            st.session_state.bankroll_actual = nuevo_inicio
+            # Opcional: Limpiar historial o registrar el evento
+            st.rerun()
+
+    # 2. VISUALIZADOR PRINCIPAL (Solo lectura, se actualiza solo)
+    st.sidebar.metric(
+        label="🏦 BANKROLL ACTUAL",
+        value=f"€{st.session_state.bankroll_actual:,.2f}",
+        delta_color="normal"
+    )
+    
+    # 3. TRANSACCIONES (Depósitos y Retiros - Mantener lógica de suma/resta directa)
+    st.sidebar.subheader("Transacciones")
+    c_dep, c_ret = st.sidebar.columns(2)
+    
+    with c_dep:
+        dep_val = st.number_input("Depósito", 0.0, step=50.0, key="in_dep")
+        if st.button("📥 Ingresar", use_container_width=True):
+            if dep_val > 0:
+                st.session_state.bankroll_actual += dep_val
+                
+                # Registrar en historial
+                registro = {
+                    'timestamp': datetime.now(),
+                    'operacion': 'deposito',
+                    'monto': dep_val,
+                    'detalle': "Depósito manual",
+                    'bankroll_final': st.session_state.bankroll_actual
+                }
+                st.session_state.historial_bankroll.append(registro)
+                st.rerun()
+                
+    with c_ret:
+        ret_val = st.number_input("Retiro", 0.0, step=50.0, key="in_ret")
+        if st.button("📤 Retirar", use_container_width=True):
+            if ret_val > 0 and ret_val <= st.session_state.bankroll_actual:
+                st.session_state.bankroll_actual -= ret_val
+                
+                # Registrar en historial
+                registro = {
+                    'timestamp': datetime.now(),
+                    'operacion': 'retiro',
+                    'monto': -ret_val,
+                    'detalle': "Retiro manual",
+                    'bankroll_final': st.session_state.bankroll_actual
+                }
+                st.session_state.historial_bankroll.append(registro)
+                st.rerun()
+            elif ret_val > st.session_state.bankroll_actual:
+                st.sidebar.error("Fondos insuficientes")
+    
+    st.sidebar.markdown("---")
     
     # BACKUP/IMPORT JSON
-    st.sidebar.markdown("---")
     st.sidebar.subheader("💾 PERSISTENCIA DE DATOS")
     
     col_backup1, col_backup2 = st.sidebar.columns(2)
@@ -677,138 +727,6 @@ if menu == "🏠 App Principal":
         
     liga = st.sidebar.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"], 
                                key="liga_selector_sidebar")
-    
-    # ============================================
-    # DEPÓSITOS Y RETIROS (CORREGIDO)
-    # ============================================
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📥 DEPÓSITOS / RETIROS")
-    
-    col_dep1, col_dep2 = st.sidebar.columns(2)
-    
-    with col_dep1:
-        deposito = st.sidebar.number_input("Depositar (€)", min_value=0.0, value=0.0, step=50.0, key="deposito_input")
-        if st.sidebar.button("📥 Depositar", use_container_width=True, key="btn_depositar"):
-            if deposito > 0:
-                # Usamos una variable temporal para evitar el error de Streamlit
-                st.session_state.bankroll_temp = st.session_state.bankroll_actual + deposito
-                
-                if 'historial_bankroll' not in st.session_state:
-                    st.session_state.historial_bankroll = []
-                
-                registro = {
-                    'timestamp': datetime.now(),
-                    'operacion': 'deposito',
-                    'monto': deposito,
-                    'detalle': "Depósito manual",
-                    'bankroll_final': st.session_state.bankroll_temp
-                }
-                st.session_state.historial_bankroll.append(registro)
-                
-                # Actualizar el bankroll principal después del rerun
-                st.session_state.bankroll_actual = st.session_state.bankroll_temp
-                st.sidebar.success(f"✅ Depositados €{deposito:.2f}")
-                st.rerun()
-    
-    with col_dep2:
-        retiro = st.sidebar.number_input("Retirar (€)", min_value=0.0, value=0.0, step=50.0, key="retiro_input")
-        if st.sidebar.button("📤 Retirar", use_container_width=True, key="btn_retirar"):
-            if retiro > 0 and retiro <= st.session_state.bankroll_actual:
-                # Usamos una variable temporal para evitar el error de Streamlit
-                st.session_state.bankroll_temp = st.session_state.bankroll_actual - retiro
-                
-                if 'historial_bankroll' not in st.session_state:
-                    st.session_state.historial_bankroll = []
-                
-                registro = {
-                    'timestamp': datetime.now(),
-                    'operacion': 'retiro',
-                    'monto': -retiro,
-                    'detalle': "Retiro manual",
-                    'bankroll_final': st.session_state.bankroll_temp
-                }
-                st.session_state.historial_bankroll.append(registro)
-                
-                # Actualizar el bankroll principal después del rerun
-                st.session_state.bankroll_actual = st.session_state.bankroll_temp
-                st.sidebar.success(f"✅ Retirados €{retiro:.2f}")
-                st.rerun()
-            elif retiro > st.session_state.bankroll_actual:
-                st.sidebar.error("❌ No tienes suficiente bankroll")
-    
-    # ============================================
-    # PANEL PRINCIPAL: DATOS DETALLADOS - TODOS LOS INPUTS CON WIDGETS
-    # ============================================
-    
-    st.header("📈 ANÁLISIS DE EQUIPOS")
-    
-    col_team1, col_team2 = st.columns(2)
-    
-    # Variables para almacenar los valores de los widgets
-    g_h_ult5 = g_h_ult10 = xg_h_prom = tiros_arco_h = posesion_h = precision_pases_h = None
-    goles_rec_h = xg_contra_h = entradas_h = recuperaciones_h = delta_h = motivacion_h = carga_fisica_h = None
-    
-    g_a_ult5 = g_a_ult10 = xg_a_prom = tiros_arco_a = posesion_a = precision_pases_a = None
-    goles_rec_a = xg_contra_a = entradas_a = recuperaciones_a = delta_a = motivacion_a = carga_fisica_a = None
-    
-    with col_team1:
-        st.subheader(f"🏠 {team_h} (Local)")
-        
-        with st.expander("📊 ESTADÍSTICAS OFENSIVAS", expanded=True):
-            col_o1, col_o2 = st.columns(2)
-            with col_o1:
-                g_h_ult5 = st.number_input(f"Goles (últ. 5p)", value=8, min_value=0, key="gh5")
-                xg_h_prom = st.number_input("xG promedio", value=1.65, step=0.05, key="xgh")
-                tiros_arco_h = st.number_input("Tiros a puerta/p", value=4.8, step=0.1, key="tir_h")
-            with col_o2:
-                g_h_ult10 = st.number_input(f"Goles (últ. 10p)", value=15, min_value=0, key="gh10")
-                posesion_h = st.slider("Posesión %", 30, 70, 52, key="pos_h")
-                precision_pases_h = st.slider("Precisión pases %", 70, 90, 82, key="pp_h")
-        
-        with st.expander("🛡️ ESTADÍSTICAS DEFENSIVAS", expanded=False):
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                goles_rec_h = st.number_input("Goles recibidos (10p)", value=12, min_value=0, key="grh")
-                xg_contra_h = st.number_input("xG en contra/p", value=1.2, step=0.05, key="xgch")
-            with col_d2:
-                entradas_h = st.number_input("Entradas/p", value=15.5, step=0.1, key="ent_h")
-                recuperaciones_h = st.number_input("Recuperaciones/p", value=45.0, step=0.5, key="rec_h")
-        
-        with st.expander("⚠️ FACTORES DE RIESGO", expanded=False):
-            delta_h = st.slider(f"Impacto bajas {team_h}", 0.0, 0.3, 0.08, step=0.01, key="delta_h")
-            motivacion_h = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05, key="mot_h")
-            carga_fisica_h = st.slider("Carga física", 0.5, 1.5, 1.0, step=0.05, key="carga_h")
-    
-    with col_team2:
-        st.subheader(f"✈️ {team_a} (Visitante)")
-        
-        with st.expander("📊 ESTADÍSTICAS OFENSIVAS", expanded=True):
-            col_o1, col_o2 = st.columns(2)
-            with col_o1:
-                g_a_ult5 = st.number_input(f"Goles (últ. 5p)", value=6, min_value=0, key="ga5")
-                xg_a_prom = st.number_input("xG promedio", value=1.40, step=0.05, key="xga")
-                tiros_arco_a = st.number_input("Tiros a puerta/p", value=4.3, step=0.1, key="tir_a")
-            with col_o2:
-                g_a_ult10 = st.number_input(f"Goles (últ. 10p)", value=12, min_value=0, key="ga10")
-                # Calculamos posesión visitante como complemento
-                posesion_a = 100 - posesion_h
-                st.metric("Posesión %", f"{posesion_a}%")
-                precision_pases_a = st.slider("Precisión pases %", 70, 90, 78, key="ppa")
-        
-        with st.expander("🛡️ ESTADÍSTICAS DEFENSIVAS", expanded=False):
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                goles_rec_a = st.number_input("Goles recibidos (10p)", value=10, min_value=0, key="gra")
-                xg_contra_a = st.number_input("xG en contra/p", value=1.05, step=0.05, key="xgca")
-            with col_d2:
-                entradas_a = st.number_input("Entradas/p", value=16.2, step=0.1, key="ent_a")
-                recuperaciones_a = st.number_input("Recuperaciones/p", value=42.5, step=0.5, key="rec_a")
-        
-        with st.expander("⚠️ FACTORES DE RIESGO", expanded=False):
-            delta_a = st.slider(f"Impacto bajas {team_a}", 0.0, 0.3, 0.05, step=0.01, key="delta_a")
-            motivacion_a = st.slider("Motivación", 0.5, 1.5, 0.9, step=0.05, key="mot_a")
-            carga_fisica_a = st.slider("Carga física", 0.5, 1.5, 1.1, step=0.05, key="cf_a")
     
     # ============================================
     # BOTÓN ÚNICO DE EJECUCIÓN (LA COCINA)
