@@ -368,6 +368,10 @@ elif menu == "🏠 App Principal":
     from datetime import datetime, timedelta
     import uuid  # Añadir esto
     
+     # 1. Diccionario Maestro (dm) - NUEVA ESTRUCTURA
+    if 'dm' not in st.session_state:
+        st.session_state['dm'] = {}
+        
     if 'entropia_mercado' not in st.session_state:
         st.session_state['entropia_mercado'] = 0.620
     if 'mostrar_resultados' not in st.session_state:
@@ -394,6 +398,14 @@ elif menu == "🏠 App Principal":
         st.session_state.historial_apuestas = []
 
     # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
+    
+    def convertir_datos_python(obj):
+    if isinstance(obj, np.integer): return int(obj)
+    if isinstance(obj, np.floating): return float(obj)
+    if isinstance(obj, np.ndarray): return obj.tolist()
+    if isinstance(obj, dict): return {k: convertir_datos_python(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [convertir_datos_python(x) for x in obj]
+    return obj
     
     # Función para debuggear widgets duplicados
     def verificar_widgets():
@@ -1855,339 +1867,427 @@ elif menu == "🏠 App Principal":
             motivacion_a = st.slider("Motivación", 0.5, 1.5, 0.9, step=0.05, key="mot_a")
             carga_fisica_a = st.slider("Carga física", 0.5, 1.5, 1.1, step=0.05, key="cf_a")
 
-    # ============ EJECUCIÓN DEL SISTEMA ============
+    # ============================================
+    # 1. SIDEBAR: BOTÓN ÚNICO DE EJECUCIÓN
+    # ============================================
     st.sidebar.markdown("---")
-    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", key="btn_run_39k"):
-        with st.spinner("🔬 Procesando Motor ACBE..."):
-            # 1. Crear el cerebro
-            modelo_bayes = ModeloBayesianoJerarquico(liga)
-            
-            # 2. Calcular la Fase 1
-            post_h = modelo_bayes.inferencia_variacional({"goles_anotados": g_h_ult10, "n_partidos": 10, "xG": xg_h_prom}, es_local=True)
-            post_a = modelo_bayes.inferencia_variacional({"goles_anotados": g_a_ult10, "n_partidos": 10, "xG": xg_a_prom}, es_local=False)
-            
-            # 3. GUARDAR TODO EN LA MALETA (Aquí se acaba el NameError)
-            st.session_state['datos_maestros'] = {
-                'post_h': post_h,
-                'post_a': post_a,
-                'equipo_h': team_h,
-                'equipo_a': team_a,
-                'cuotas': [c1, cx, c2],
-                'or_val': or_val,
-                'timestamp': datetime.now()
-            }
-            st.session_state['analisis_ejecutado'] = True
-            
-            st.sidebar.success("✅ Análisis completado")
-            st.rerun() # <--- OBLIGATORIO: Fuerza a la app a ver los resultados
+    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", key="btn_final_maestro"):
         
-        # 🔴 DEBUG: AÑADIR AQUÍ - VERIFICAR QUE TODO SE EJECUTA
-        st.write("DEBUG: Botón ejecutar presionado")
-    
-        datos = {
-            'team_h': team_h,
-            'team_a': team_a,
-            'g_h_ult5': g_h_ult5,
-            'g_h_ult10': g_h_ult10,
-            'xg_h_prom': xg_h_prom,
-            'tiros_arco_h': tiros_arco_h,
-            'posesion_h': posesion_h,
-            'precision_pases_h': precision_pases_h,
-            'goles_rec_h': goles_rec_h,
-            'xg_contra_h': xg_contra_h,
-            'entradas_h': entradas_h,
-            'recuperaciones_h': recuperaciones_h,
-            'delta_h': delta_h,
-            'motivacion_h': motivacion_h,
-            'carga_fisica_h': carga_fisica_h,
-            'g_a_ult5': g_a_ult5,
-            'g_a_ult10': g_a_ult10,
-            'xg_a_prom': xg_a_prom,
-            'tiros_arco_a': tiros_arco_a,
-            'posesion_a': posesion_a,
-            'precision_pases_a': precision_pases_a,
-            'goles_rec_a': goles_rec_a,
-            'xg_contra_a': xg_contra_a,
-            'entradas_a': entradas_a,
-            'recuperaciones_a': recuperaciones_a,
-            'delta_a': delta_a,
-            'motivacion_a': motivacion_a,
-            'carga_fisica_a': carga_fisica_a,
-            'cuotas': {'1': c1, 'X': cx, '2': c2},
-            'overround': or_val,
-            'volumen_estimado': volumen_estimado,
-            'steam_detectado': steam_detectado,
-            'entropia_mercado': float(entropia_mercado) if 'entropia_mercado' in locals() else 0.620,
-            'liga': liga       
-        }
-        
-        # ============ INICIALIZAR COMPONENTES ============
-        with st.spinner("🔬 Inicializando modelo bayesiano jerárquico..."):
-            modelo_bayes = ModeloBayesianoJerarquico(liga)
-            detector = DetectorIneficiencias()
-            gestor_riesgo = GestorRiscoCVaR(cvar_target=cvar_target, max_drawdown=max_dd)
-            backtester = BacktestSintetico()
-            
-        # === CORRECCIÓN A: ACTIVADOR DE MEMORIA ===
-        st.session_state['analisis_ejecutado'] = True
-        st.session_state['mostrar_resultados'] = True
-        st.success("✅ Motor Cuántico Inicializado")
-        st.rerun() # <--- OBLIGATORIO para que aparezca todo al instante
-    
-    # En la barra lateral, después del botón de ejecutar análisis:
-    st.sidebar.markdown("---")
-    
-    # Si el análisis se ejecutó, mostramos las 2000 líneas de resultados
-    if st.session_state.get('analisis_ejecutado', False):
-        if st.sidebar.button("🔄 Re-ejecutar último análisis", type="secondary"):
-            # Cargar parámetros guardados
-            inputs = st.session_state.get('inputs_analisis', {})
-            # Aquí deberías rellenar automáticamente los inputs con los valores guardados
-            st.sidebar.success("Parámetros cargados. Presiona 'EJECUTAR ANÁLISIS COMPLETO'")
-            st.session_state['cargar_ultimo_analisis'] = True
-            st.rerun()
-        
-        # === ESTE IF ES EL INTERRUPTOR QUE ENCIENDE LOS RESULTADOS ===
-        if st.session_state.get('analisis_ejecutado', False):
-            dm = st.session_state['datos_maestros']
-            
-            # ============ FASE 0: VALIDACIÓN DE MERCADO ============
-            with st.spinner("🔍 Validando condiciones del mercado..."):
-                st.subheader("🎯 FASE 0: VALIDACIÓN DE MERCADO")
+        with st.sidebar:
+            with st.spinner("🧠 EJECUTANDO ANÁLISIS COMPLETO..."):
                 
-                col_val1, col_val2, col_val3, col_val4 = st.columns(4)
+                # ============================================
+                # FASE 1: INFERENCIA VARIACIONAL
+                # ============================================
+                with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
+                    # Obtener inputs (40+ variables)
+                    datos = {
+                        'team_h': team_h, 'team_a': team_a,
+                        'g_h_ult5': g_h_ult5, 'g_h_ult10': g_h_ult10,
+                        'xg_h_prom': xg_h_prom, 'tiros_arco_h': tiros_arco_h,
+                        'posesion_h': posesion_h, 'precision_pases_h': precision_pases_h,
+                        'goles_rec_h': goles_rec_h, 'xg_contra_h': xg_contra_h,
+                        'entradas_h': entradas_h, 'recuperaciones_h': recuperaciones_h,
+                        'delta_h': delta_h, 'motivacion_h': motivacion_h,
+                        'carga_fisica_h': carga_fisica_h,
+                        'g_a_ult5': g_a_ult5, 'g_a_ult10': g_a_ult10,
+                        'xg_a_prom': xg_a_prom, 'tiros_arco_a': tiros_arco_a,
+                        'posesion_a': posesion_a, 'precision_pases_a': precision_pases_a,
+                        'goles_rec_a': goles_rec_a, 'xg_contra_a': xg_contra_a,
+                        'entradas_a': entradas_a, 'recuperaciones_a': recuperaciones_a,
+                        'delta_a': delta_a, 'motivacion_a': motivacion_a,
+                        'carga_fisica_a': carga_fisica_a,
+                        'cuotas': {'1': c1, 'X': cx, '2': c2},
+                        'overround': or_val, 'liga': liga,
+                        'volumen_estimado': volumen_estimado,
+                        'steam_detectado': steam_detectado,
+                        'entropia_mercado': entropia_mercado if 'entropia_mercado' in locals() else 0.620
+                    }
+                    
+                    # Guardar inputs
+                    st.session_state['dm']['inputs'] = datos
+                    
+                    # Preparar datos para inferencia
+                    datos_local = {
+                        "goles_anotados": g_h_ult10, "goles_recibidos": goles_rec_h,
+                        "n_partidos": 10, "xG": xg_h_prom, "tiros_arco": tiros_arco_h,
+                        "posesion": posesion_h, "precision_pases": precision_pases_h
+                    }
+                    datos_visitante = {
+                        "goles_anotados": g_a_ult10, "goles_recibidos": goles_rec_a,
+                        "n_partidos": 10, "xG": xg_a_prom, "tiros_arco": tiros_arco_a,
+                        "posesion": posesion_a, "precision_pases": precision_pases_a
+                    }
+                    
+                    # Ejecutar inferencia
+                    modelo_bayes = ModeloBayesianoJerarquico(liga)
+                    post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
+                    post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
+                    
+                    # Guardar resultados Fase 1
+                    st.session_state['dm']['fase1'] = {
+                        'modelo': modelo_bayes,
+                        'post_h': post_h,
+                        'post_a': post_a,
+                        'l_h_adj': post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h,
+                        'l_a_adj': post_a["lambda"] * (1 - delta_a) * motivacion_a / carga_fisica_a,
+                        'inc_h': post_h['incertidumbre'],
+                        'inc_a': post_a['incertidumbre'],
+                        'ci_h': post_h['ci_95'],
+                        'ci_a': post_a['ci_95']
+                    }
                 
-                with col_val1:
-                    val_min_odd = c1 >= 1.60 and c2 >= 1.60
-                    st.metric("Cuota Mínima", "✅" if val_min_odd else "❌", 
-                            delta="OK" if val_min_odd else "< 1.60")
+                # ============================================
+                # FASE 2: SIMULACIÓN MONTE CARLO
+                # ============================================
+                with st.spinner("🎲 Fase 2: Simulación Monte Carlo (50k escenarios)..."):
+                    n_sim = 50000
+                    post_h = st.session_state['dm']['fase1']['post_h']
+                    post_a = st.session_state['dm']['fase1']['post_a']
+                    
+                    # Cálculo vectorizado
+                    l_h_sims = np.random.gamma(
+                        post_h["alpha"], 1/post_h["beta"], n_sim
+                    ) * (1 - delta_h) * motivacion_h / carga_fisica_h
+                    
+                    l_a_sims = np.random.gamma(
+                        post_a["alpha"], 1/post_a["beta"], n_sim
+                    ) * (1 - delta_a) * motivacion_a / carga_fisica_a
+                    
+                    goles_h = np.random.poisson(l_h_sims)
+                    goles_a = np.random.poisson(l_a_sims)
+                    
+                    # Probabilidades
+                    p1_mc = float(np.mean(goles_h > goles_a))
+                    px_mc = float(np.mean(goles_h == goles_a))
+                    p2_mc = float(np.mean(goles_h < goles_a))
+                    
+                    # Errores estándar
+                    se_p1 = float(np.sqrt(p1_mc*(1-p1_mc)/n_sim))
+                    se_px = float(np.sqrt(px_mc*(1-px_mc)/n_sim))
+                    se_p2 = float(np.sqrt(p2_mc*(1-p2_mc)/n_sim))
+                    
+                    # Guardar resultados Fase 2
+                    st.session_state['dm']['fase2'] = {
+                        'p1': p1_mc,
+                        'px': px_mc,
+                        'p2': p2_mc,
+                        'se': [se_p1, se_px, se_p2],
+                        'goles_h_sims': goles_h,
+                        'goles_a_sims': goles_a,
+                        'n_sim': n_sim
+                    }
                 
-                with col_val2:
-                    val_or = or_val <= 0.07
-                    st.metric("Overround", "✅" if val_or else "❌", 
-                            delta=f"{or_val:.2%}" if val_or else "Alto")
+                # ============================================
+                # FASE 3: DETECCIÓN DE INEFICIENCIAS
+                # ============================================
+                with st.spinner("🔍 Fase 3: Detectando ineficiencias..."):
+                    # Inicializar detector
+                    detector = DetectorIneficiencias()
+                    
+                    # Probabilidades del mercado
+                    p1_mercado = 1 / c1
+                    px_mercado = 1 / cx
+                    p2_mercado = 1 / c2
+                    
+                    # Entropía de Shannon
+                    prob_mercado_array = np.array([p1_mercado, px_mercado, p2_mercado])
+                    prob_mercado_array = prob_mercado_array[prob_mercado_array > 0]
+                    entropia_auto = -np.sum(prob_mercado_array * np.log2(prob_mercado_array))
+                    
+                    # Análisis para cada resultado
+                    resultados_analisis = []
+                    picks_con_valor = []
+                    
+                    for label, p_modelo, p_mercado, se, cuota in zip(
+                        ["1", "X", "2"],
+                        [p1_mc, px_mc, p2_mc],
+                        [p1_mercado, px_mercado, p2_mercado],
+                        [se_p1, se_px, se_p2],
+                        [c1, cx, c2]
+                    ):
+                        # Value Score
+                        value_analysis = detector.calcular_value_score(p_modelo, p_mercado, se)
+                        
+                        # KL Divergence
+                        kl_analysis = detector.calcular_entropia_kullback_leibler(p_modelo, p_mercado)
+                        
+                        # Valor esperado
+                        ev = p_modelo * cuota - 1
+                        
+                        # Cuota justa
+                        fair_odd = 1 / p_modelo if p_modelo > 0 else 999
+                        
+                        resultado = {
+                            "Resultado": label,
+                            "Prob Modelo": float(p_modelo),
+                            "Prob Mercado": float(p_mercado),
+                            "Delta": float(p_modelo - p_mercado),
+                            "EV": float(ev),
+                            "Fair Odd": float(fair_odd),
+                            "Cuota Mercado": float(cuota),
+                            "Value Score": {
+                                "t_statistic": float(value_analysis.get("t_statistic", 0)),
+                                "significativo": bool(value_analysis.get("significativo", False))
+                            },
+                            "KL Divergence": {
+                                "informacion_bits": float(kl_analysis.get("informacion_bits", 0))
+                            }
+                        }
+                        
+                        resultados_analisis.append(resultado)
+                        
+                        # Identificar picks con valor
+                        if value_analysis.get("significativo", False) and ev > 0.02:
+                            picks_con_valor.append(resultado)
+                    
+                    # Guardar resultados Fase 3
+                    st.session_state['dm']['fase3'] = {
+                        'detector': detector,
+                        'resultados_analisis': resultados_analisis,
+                        'picks_con_valor': picks_con_valor,
+                        'entropia_auto': entropia_auto
+                    }
                 
-                with col_val3:
-                    val_entropia = entropia_mercado <= 0.72
-                    st.metric("Entropía", "✅" if val_entropia else "❌",
-                            delta=f"{entropia_mercado:.3f}")
+                # ============================================
+                # FASE 4: GESTIÓN DE CAPITAL
+                # ============================================
+                with st.spinner("💰 Fase 4: Gestión de capital (Kelly Dinámico)..."):
+                    # Inicializar componentes
+                    gestor_riesgo = GestorRiscoCVaR(cvar_target=cvar_target, max_drawdown=max_dd)
+                    backtester = BacktestSintetico()
+                    
+                    bankroll = st.session_state.get('bankroll_actual', 1000.0)
+                    picks_con_valor = st.session_state['dm']['fase3']['picks_con_valor']
+                    post_h = st.session_state['dm']['fase1']['post_h']
+                    post_a = st.session_state['dm']['fase1']['post_a']
+                    entropia_auto = st.session_state['dm']['fase3']['entropia_auto']
+                    
+                    # Ejecutar gestión de capital para cada pick con valor
+                    recomendaciones = []
+                    
+                    for r in picks_con_valor:
+                        try:
+                            # Datos numéricos
+                            prob_modelo_numerico = r["Prob Modelo"]
+                            cuota_numerico = r["Cuota Mercado"]
+                            ev_numerico = r["EV"]
+                            significativo = r["Value Score"]["significativo"]
+                            
+                            # Simulación CVaR
+                            simulacion_cvar = gestor_riesgo.simular_cvar(
+                                prob=prob_modelo_numerico,
+                                cuota=cuota_numerico,
+                                n_simulaciones=10000,
+                                conf_level=0.95
+                            )
+                            
+                            # Incertidumbre según resultado
+                            if r["Resultado"] == "1":
+                                incertidumbre_valor = post_h.get("incertidumbre", 0.5)
+                            elif r["Resultado"] in ["2", "X"]:
+                                incertidumbre_valor = post_a.get("incertidumbre", 0.5)
+                            else:
+                                incertidumbre_valor = 0.5
+                            
+                            # Métricas para Kelly
+                            metrics_kelly = {
+                                "incertidumbre": incertidumbre_valor,
+                                "cvar_estimado": simulacion_cvar.get("cvar", 0.15),
+                                "entropia": entropia_auto,
+                                "sharpe_esperado": simulacion_cvar.get("sharpe_simulado", 1.0),
+                                "prob_modelo": prob_modelo_numerico,
+                                "valor_estadistico": r["Value Score"]["t_statistic"],
+                                "ev": ev_numerico,
+                                "significativo": significativo
+                            }
+                            
+                            # Kelly Dinámico
+                            kelly_result = gestor_riesgo.calcular_kelly_dinamico(
+                                prob=prob_modelo_numerico,
+                                cuota=cuota_numerico,
+                                bankroll=bankroll,
+                                metrics=metrics_kelly
+                            )
+                            
+                            # Backtest Sintético
+                            backtest_result = backtester.generar_escenarios(
+                                prob=prob_modelo_numerico,
+                                cuota=cuota_numerico,
+                                bankroll_inicial=bankroll,
+                                n_apuestas=100,
+                                n_simulaciones=2000
+                            )
+                            
+                            recomendacion = {
+                                "resultado": r["Resultado"],
+                                "ev": f"{ev_numerico:.2%}",
+                                "kelly_pct": kelly_result.get("stake_pct", 0),
+                                "stake_abs": kelly_result.get("stake_abs", 0),
+                                "cvar": simulacion_cvar.get("cvar", 0.15),
+                                "sharpe_esperado": backtest_result["metricas"].get("sharpe_promedio", 0),
+                                "prob_profit": backtest_result["metricas"].get("prob_profit", 0),
+                                "max_dd_promedio": backtest_result["metricas"].get("max_dd_promedio", 0),
+                                "backtest_metrics": backtest_result["metricas"],
+                                "razon_kelly": kelly_result.get("razon", "Sin información"),
+                                "prob_modelo_numerico": prob_modelo_numerico,
+                                "cuota_numerico": cuota_numerico,
+                                "ev_numerico": ev_numerico
+                            }
+                            
+                            recomendaciones.append(recomendacion)
+                            
+                        except Exception as e:
+                            st.warning(f"⚠️ Error procesando pick {r.get('Resultado', 'N/A')}: {str(e)}")
+                            continue
+                    
+                    # Guardar resultados Fase 4
+                    st.session_state['dm']['fase4'] = {
+                        'gestor_riesgo': gestor_riesgo,
+                        'backtester': backtester,
+                        'recomendaciones': recomendaciones,
+                        'bankroll': bankroll
+                    }
                 
-                with col_val4:
-                    val_volumen = volumen_estimado >= 0.8
-                    st.metric("Liquidez", "✅" if val_volumen else "⚠️",
-                            delta=f"{volumen_estimado:.1f}x")
+                # ============================================
+                # FASE 5: MÉTRICAS DE PERFORMANCE
+                # ============================================
+                with st.spinner("📊 Fase 5: Generando métricas de performance..."):
+                    recomendaciones = st.session_state['dm']['fase4']['recomendaciones']
+                    
+                    # Calcular métricas agregadas
+                    ev_promedio = 0
+                    sharpe_promedio = 0
+                    cvar_promedio = 0
+                    prob_profit_promedio = 0
+                    objetivos_cumplidos = []
+                    
+                    if recomendaciones:
+                        ev_valores = [r['ev_numerico'] for r in recomendaciones]
+                        ev_promedio = np.mean(ev_valores)
+                        sharpe_promedio = np.mean([r.get('sharpe_esperado', 0) for r in recomendaciones])
+                        cvar_promedio = np.mean([r.get('cvar', 0.15) for r in recomendaciones])
+                        prob_profit_promedio = np.mean([r.get('prob_profit', 0) for r in recomendaciones])
+                        
+                        # Verificar objetivos
+                        if ev_promedio * 100 >= roi_target * 0.8:
+                            objetivos_cumplidos.append("ROI")
+                        if cvar_promedio <= cvar_target/100:
+                            objetivos_cumplidos.append("CVaR")
+                        if sharpe_promedio >= sharpe_min:
+                            objetivos_cumplidos.append("Sharpe")
+                    
+                    # Guardar resultados Fase 5
+                    st.session_state['dm']['fase5'] = {
+                        'ev_promedio': ev_promedio,
+                        'sharpe_promedio': sharpe_promedio,
+                        'cvar_promedio': cvar_promedio,
+                        'prob_profit_promedio': prob_profit_promedio,
+                        'objetivos_cumplidos': objetivos_cumplidos,
+                        'roi_target': roi_target,
+                        'cvar_target': cvar_target,
+                        'sharpe_min': sharpe_min
+                    }
                 
-                # Verificar condiciones de evasión
-                condiciones_evasion = []
-                if not val_min_odd: condiciones_evasion.append("Cuota < 1.60")
-                if not val_or: condiciones_evasion.append(f"Overround alto ({or_val:.2%})")
-                if not val_entropia: condiciones_evasion.append(f"Entropía alta ({entropia_mercado:.3f})")
-                
-                if condiciones_evasion:
-                    st.error(f"🚫 EVASIÓN DE RIESGO: {', '.join(condiciones_evasion)}")
-                    st.stop()
-                
-                st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
-        
-        if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", key="btn_final_39k"):
-            with st.spinner("🧠 EJECUTANDO INFERENCIA BAYESIANA..."):
-                # A) CREAR EL MODELO (Importante para evitar el NameError)
-                modelo_bayes = ModeloBayesianoJerarquico(liga)
-                
-                # B) PREPARAR DATOS
-                datos_local = {
-                    "goles_anotados": g_h_ult10, "goles_recibidos": goles_rec_h,
-                    "n_partidos": 10, "xG": xg_h_prom, "tiros_arco": tiros_arco_h,
-                    "posesion": posesion_h, "precision_pases": precision_pases_h
-                }
-                datos_visitante = {
-                    "goles_anotados": g_a_ult10, "goles_recibidos": goles_rec_a,
-                    "n_partidos": 10, "xG": xg_a_prom, "tiros_arco": tiros_arco_a,
-                    "posesion": posesion_a, "precision_pases": precision_pases_a
-                }
-                
-                # C) CÁLCULO
-                post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
-                post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
-                
-                l_h_adj = post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
-                l_a_adj = post_a["lambda"] * (1 - delta_a) * motivacion_a / carga_fisica_a
-
-                # D) GUARDADO EN LA MALETA (Aquí es donde evitas que se borre)
-                st.session_state['datos_fase1'] = {
-                    'team_h': team_h, 'team_a': team_a,
-                    'l_h': l_h_adj, 'l_a': l_a_adj,
-                    'inc_h': post_h['incertidumbre'], 'inc_a': post_a['incertidumbre'],
-                    'ci_h': post_h['ci_95'], 'ci_a': post_a['ci_95']
-                }
+                # ============================================
+                # FINALIZACIÓN
+                # ============================================
                 st.session_state['analisis_ejecutado'] = True
-                st.rerun() # Fuerza a la app a mostrar los resultados inmediatamente
-                
-        # === RENDERIZADO DE FASE 1 ===
-        if st.session_state.get('analisis_ejecutado', False) and 'datos_fase1' in st.session_state:
-            df1 = st.session_state['datos_fase1']
-                
-            st.subheader("🎯 FASE 1: INFERENCIA BAYESIANA")
-            col_inf1, col_inf2 = st.columns(2)
-                
-            with col_inf1:
-                st.markdown(f"**🏠 {df1['team_h']}**")
-                st.metric("λ Posterior", f"{df1['l_h']:.3f}", help="Goles esperados ajustados")
-                st.metric("Incertidumbre", f"{df1['inc_h']:.3%}")
-                st.caption(f"Intervalo Credibilidad: {df1['ci_h'][0]:.2f} - {df1['ci_h'][1]:.2f}")
-                
-            with col_inf2:
-                st.markdown(f"**✈️ {df1['team_a']}**")
-                st.metric("λ Posterior", f"{df1['l_a']:.3f}", help="Goles esperados ajustados")
-                st.metric("Incertidumbre", f"{df1['inc_a']:.3%}")
-                st.caption(f"Intervalo Credibilidad: {df1['ci_a'][0]:.2f} - {df1['ci_a'][1]:.2f}")    
+                st.success("✅ ANÁLISIS COMPLETO EJECUTADO")
+                st.rerun()
+
+    # ============================================
+    # 2. RENDERIZADO PERSISTENTE (EL SALÓN)
+    # ============================================
+    if st.session_state.get('analisis_ejecutado', False) and 'dm' in st.session_state:
+        dm = st.session_state['dm']
         
-        with st.spinner("🎲 SIMULANDO 50,000 ESCENARIOS..."):
-            st.subheader("🎯 FASE 2: SIMULACIÓN MONTE CARLO AVANZADA")
+        # ============ VALIDACIÓN DE MERCADO ============
+        if 'inputs' in dm:
+            inputs = dm['inputs']
+            st.subheader("🎯 VALIDACIÓN DE MERCADO")
             
-            # Simulación con incertidumbre paramétrica
-            n_simulaciones = 50000
-            resultados_sim = []
+            col_val1, col_val2, col_val3, col_val4 = st.columns(4)
             
-            progress_bar = st.progress(0)
-            for i in range(n_simulaciones):
-                # Muestrear de la distribución posterior
-                lambda_h_sim = np.random.gamma(
-                    posterior_local["alpha"], 
-                    1/posterior_local["beta"]
-                ) * (1 - delta_h) * motivacion_h / carga_fisica_h
-                
-                lambda_a_sim = np.random.gamma(
-                    posterior_visitante["alpha"],
-                    1/posterior_visitante["beta"]
-                ) * (1 - delta_a) * motivacion_a / carga_fisica_a
-                
-                # Simular goles
-                goles_h = np.random.poisson(lambda_h_sim)
-                goles_a = np.random.poisson(lambda_a_sim)
-                
-                # Determinar resultado
-                if goles_h > goles_a:
-                    resultado = "1"
-                elif goles_h == goles_a:
-                    resultado = "X"
-                else:
-                    resultado = "2"
-                
-                resultados_sim.append(resultado)
-                
-                if i % 10000 == 0:
-                    progress_bar.progress((i + 1) / n_simulaciones)
+            with col_val1:
+                val_min_odd = inputs['cuotas']['1'] >= 1.60 and inputs['cuotas']['2'] >= 1.60
+                st.metric("Cuota Mínima", "✅" if val_min_odd else "❌", 
+                        delta="OK" if val_min_odd else "< 1.60")
             
-            progress_bar.progress(1.0)
+            with col_val2:
+                val_or = inputs['overround'] <= 0.07
+                st.metric("Overround", "✅" if val_or else "❌", 
+                        delta=f"{inputs['overround']:.2%}" if val_or else "Alto")
             
-            # Calcular probabilidades
-            resultados_array = np.array(resultados_sim)
-            p1_mc = np.mean(resultados_array == "1")
-            px_mc = np.mean(resultados_array == "X")
-            p2_mc = np.mean(resultados_array == "2")
+            with col_val3:
+                val_entropia = inputs['entropia_mercado'] <= 0.72
+                st.metric("Entropía", "✅" if val_entropia else "❌",
+                        delta=f"{inputs['entropia_mercado']:.3f}")
             
-            # Calcular incertidumbre (error estándar)
-            se_p1 = np.sqrt(p1_mc * (1 - p1_mc) / n_simulaciones)
-            se_px = np.sqrt(px_mc * (1 - px_mc) / n_simulaciones)
-            se_p2 = np.sqrt(p2_mc * (1 - p2_mc) / n_simulaciones)
+            with col_val4:
+                val_volumen = inputs.get('volumen_estimado', 1) >= 0.8
+                st.metric("Liquidez", "✅" if val_volumen else "⚠️",
+                        delta=f"{inputs.get('volumen_estimado', 1):.1f}x")
             
-            # Visualizar distribución
+            # Verificar condiciones
+            condiciones_evasion = []
+            if not val_min_odd: condiciones_evasion.append("Cuota < 1.60")
+            if not val_or: condiciones_evasion.append(f"Overround alto ({inputs['overround']:.2%})")
+            if not val_entropia: condiciones_evasion.append(f"Entropía alta ({inputs['entropia_mercado']:.3f})")
+            
+            if condiciones_evasion:
+                st.error(f"🚫 EVASIÓN DE RIESGO: {', '.join(condiciones_evasion)}")
+                st.stop()
+            
+            st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
+        
+        # ============ FASE 1: INFERENCIA BAYESIANA ============
+        if 'fase1' in dm:
+            f1 = dm['fase1']
+            inputs = dm['inputs']
+            
+            st.subheader("🧠 FASE 1: INFERENCIA BAYESIANA")
+            col_inf1, col_inf2 = st.columns(2)
+            
+            with col_inf1:
+                st.markdown(f"**🏠 {inputs['team_h']}**")
+                st.metric("λ Posterior", f"{f1['l_h_adj']:.3f}", help="Goles esperados ajustados")
+                st.metric("Incertidumbre", f"{f1['inc_h']:.3%}")
+                st.caption(f"Intervalo Credibilidad: {f1['ci_h'][0]:.2f} - {f1['ci_h'][1]:.2f}")
+            
+            with col_inf2:
+                st.markdown(f"**✈️ {inputs['team_a']}**")
+                st.metric("λ Posterior", f"{f1['l_a_adj']:.3f}", help="Goles esperados ajustados")
+                st.metric("Incertidumbre", f"{f1['inc_a']:.3%}")
+                st.caption(f"Intervalo Credibilidad: {f1['ci_a'][0]:.2f} - {f1['ci_a'][1]:.2f}")
+        
+        # ============ FASE 2: SIMULACIÓN MONTE CARLO ============
+        if 'fase2' in dm:
+            f2 = dm['fase2']
+            
+            st.subheader("🎲 FASE 2: SIMULACIÓN MONTE CARLO (50,000 escenarios)")
+            
+            # Gráfico de barras
             fig_sim = go.Figure(data=[
                 go.Bar(
-                    x=["1", "X", "2"],
-                    y=[p1_mc, px_mc, p2_mc],
-                    error_y=dict(type='data', array=[se_p1, se_px, se_p2]),
-                    marker_color=['#00CC96', '#636EFA', '#EF553B']
+                    x=["1 (Local)", "X (Empate)", "2 (Visitante)"],
+                    y=[f2['p1'], f2['px'], f2['p2']],
+                    error_y=dict(type='data', array=f2['se']),
+                    marker_color=['#00CC96', '#636EFA', '#EF553B'],
+                    text=[f"{f2['p1']:.1%}", f"{f2['px']:.1%}", f"{f2['p2']:.1%}"],
+                    textposition='auto',
                 )
             ])
-            
-            fig_sim.update_layout(
-                title="Distribución de Probabilidades (Monte Carlo)",
-                yaxis_title="Probabilidad",
-                showlegend=False
-            )
-            
+            fig_sim.update_layout(template="plotly_dark", height=450, showlegend=False)
             st.plotly_chart(fig_sim, use_container_width=True)
         
-        with st.spinner("🔍 DETECTANDO INEFICIENCIAS..."):
-            st.subheader("🎯 FASE 3: DETECCIÓN DE INEFICIENCIAS")
+        # ============ FASE 3: DETECCIÓN DE INEFICIENCIAS ============
+        if 'fase3' in dm:
+            f3 = dm['fase3']
             
-            # Probabilidades implícitas del mercado
-            p1_mercado = 1 / c1
-            px_mercado = 1 / cx
-            p2_mercado = 1 / c2
+            st.subheader("🔍 FASE 3: DETECCIÓN DE INEFICIENCIAS")
             
-            # ============ CALCULAR ENTROPÍA AUTO ============
-            # Calcula entropía de Shannon de las probabilidades del mercado
-            import numpy as np
-            prob_mercado_array = np.array([p1_mercado, px_mercado, p2_mercado])
-            prob_mercado_array = prob_mercado_array[prob_mercado_array > 0]  # Evitar log(0)
-            entropia_auto = -np.sum(prob_mercado_array * np.log2(prob_mercado_array))
-            
-            # Análisis para cada resultado
-            resultados_analisis = []
-            
-            for label, p_modelo, p_mercado, se, cuota in zip(
-                ["1", "X", "2"],
-                [p1_mc, px_mc, p2_mc],
-                [p1_mercado, px_mercado, p2_mercado],
-                [se_p1, se_px, se_p2],
-                [c1, cx, c2]
-            ):
-                # Value Score estadístico
-                value_analysis = detector.calcular_value_score(p_modelo, p_mercado, se)
-                
-                # KL Divergence
-                kl_analysis = detector.calcular_entropia_kullback_leibler(p_modelo, p_mercado)
-                
-                # Valor esperado
-                ev = p_modelo * cuota - 1
-                
-                # Cuota justa
-                fair_odd = 1 / p_modelo if p_modelo > 0 else 999
-                
-                # Convertir valores numpy a Python nativo
-                resultados_analisis.append({
-                    "Resultado": label,
-                    "Prob Modelo": float(p_modelo),  # CONVERTIR a float
-                    "Prob Mercado": float(p_mercado),
-                    "Delta": float(p_modelo - p_mercado),
-                    "EV": float(ev),  # CONVERTIR a float
-                    "Fair Odd": float(fair_odd),
-                    "Cuota Mercado": float(cuota),
-                    "Value Score": {
-                        "t_statistic": float(value_analysis.get("t_statistic", 0)),
-                        "significativo": bool(value_analysis.get("significativo", False))
-                    },
-                    "KL Divergence": {
-                        "informacion_bits": float(kl_analysis.get("informacion_bits", 0))
-                    }
-                })
-                
-            # Convertir TODOS los datos numpy
-            resultados_analisis = convertir_datos_python(resultados_analisis)
-                
-            # ============ AQUÍ MOVEMOS EL GUARDADO (FUERA DEL LOOP) ============
-            # Ahora guardamos en session_state UNA SOLA VEZ, después del loop
-            st.session_state['resultados_analisis'] = resultados_analisis
-            st.session_state['analisis_completo'] = {
-                'team_h': team_h,
-                'team_a': team_a,
-                'liga': liga,
-                'or_val': or_val,
-                'entropia': entropia_auto,  # Ahora sí está definida
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-
-            # También guarda las probabilidades numéricas para cálculos
-            st.session_state['probabilidades_numericas'] = {
-                '1': p1_mc,
-                'X': px_mc,
-                '2': p2_mc
-            }
-            
-            # Crear tabla de resultados
+            # Tabla de resultados
             df_resultados = pd.DataFrame([
                 {
                     "Resultado": r["Resultado"],
@@ -2201,377 +2301,118 @@ elif menu == "🏠 App Principal":
                     "Significativo": "✅" if r['Value Score']['significativo'] else "❌",
                     "KL Bits": f"{r['KL Divergence']['informacion_bits']:.3f}"
                 }
-                for r in resultados_analisis
+                for r in f3['resultados_analisis']
             ])
-            
             st.dataframe(df_resultados, use_container_width=True)
             
-            # Identificar picks con valor
-            picks_con_valor = []
-            for r in resultados_analisis:
-                try:
-                    ev_val = float(r['EV'])  # Ya es float, no string
-                    if r['Value Score']['significativo'] and ev_val > 0.02:
-                        picks_con_valor.append(r)
-                except Exception as e:
-                    st.warning(f"Error procesando pick {r.get('Resultado', 'N/A')}: {e}")
-                                
-            # =============================================
-            # 🔴🔴🔴 AQUÍ VA LA LÍNEA QUE PREGUNTAS 🔴🔴🔴
-            # =============================================
-            st.session_state['picks_con_valor'] = picks_con_valor  # ← JUSTO AQUÍ
-            
-            st.session_state['analisis_completo'] = {
-                'team_h': team_h,
-                'team_a': team_a,
-                'or_val': or_val,
-                'entropia': st.session_state.get('entropia_mercado', 0.620), 
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            # ==============================================================
-            
+            # Picks con valor
+            picks_con_valor = f3['picks_con_valor']
             if picks_con_valor:
                 st.success(f"✅ **{len(picks_con_valor)} INEFICIENCIA(S) DETECTADA(S)**")
             else:
                 st.warning("⚠️ MERCADO EFICIENTE: No se detectan ineficiencias significativas")
-            
-            if 'recomendacion_ejecutada' not in st.session_state:
-                agregar_modulo_recomendacion()
-                st.session_state['recomendacion_ejecutada'] = True
-                
-        def ejecutar_fase_4(picks_con_valor, gestor_riesgo, backtester, bankroll=1000, 
-                    posterior_local=None, posterior_visitante=None, 
-                    entropia_mercado=0.6, roi_target=12):
-            """
-            Ejecuta la Fase 4: Gestión de Capital (Kelly Dinámico)
-            
-            Args:
-                picks_con_valor: Lista de picks con EV positivo y significativo
-                gestor_riesgo: Instancia de GestorRiscoCVaR
-                backtester: Instancia de BacktestSintetico
-                bankroll: Bankroll inicial en euros
-                posterior_local: Distribución posterior del equipo local
-                posterior_visitante: Distribución posterior del equipo visitante
-                entropia_mercado: Entropía calculada del mercado
-                roi_target: ROI objetivo para visualización
-            
-            Returns:
-                Lista de recomendaciones y visualizaciones Streamlit
-            """
-            
-            recomendaciones = []
-
-            if not picks_con_valor:
-                st.info("📊 No hay picks con valor estadísticamente significativo y EV > 2%")
-                return []
-            
-            for r in picks_con_valor:
-                try:
-                    # --- CONVERSIÓN DE DATOS A NUMÉRICOS ---
-                    prob_raw = r.get("Prob Modelo", "0%")
-                    if isinstance(prob_raw, str) and '%' in prob_raw:
-                        prob_modelo_numerico = float(prob_raw.replace('%', '').strip()) / 100
-                    else:
-                        prob_modelo_numerico = float(prob_raw)
-                    
-                    cuota_raw = r.get("Cuota Mercado", 1.0)
-                    cuota_numerico = float(cuota_raw)
-                    
-                    ev_raw = r.get("EV", "0%")
-                    if isinstance(ev_raw, str) and '%' in ev_raw:
-                        ev_numerico = float(ev_raw.replace('%', '').strip()) / 100
-                    else:
-                        ev_numerico = float(ev_raw)
-                    
-                    significativo = r.get("Value Score", {}).get("significativo", False)
-                    
-                    # --- SIMULACIÓN CVAR ---
-                    simulacion_cvar = gestor_riesgo.simular_cvar(
-                        prob=prob_modelo_numerico,
-                        cuota=cuota_numerico,
-                        n_simulaciones=10000,
-                        conf_level=0.95
-                    )
-                    
-                    # --- PREPARACIÓN DE MÉTRICAS PARA KELLY ---
-                    incertidumbre_valor = 0.5
-                    if r["Resultado"] == "1" and posterior_local:
-                        incertidumbre_valor = posterior_local.get("incertidumbre", 0.5)
-                    elif r["Resultado"] in ["2", "X"] and posterior_visitante:
-                        incertidumbre_valor = posterior_visitante.get("incertidumbre", 0.5)
-                    
-                    metrics_kelly = {
-                        "incertidumbre": incertidumbre_valor,
-                        "cvar_estimado": simulacion_cvar.get("cvar", 0.15),
-                        "entropia": entropia_mercado,
-                        "sharpe_esperado": simulacion_cvar.get("sharpe_simulado", 1.0),
-                        "prob_modelo": prob_modelo_numerico,
-                        "valor_estadistico": r.get("Value Score", {}).get("t_statistic", 0),
-                        "ev": ev_numerico,
-                        "significativo": significativo
-                    }
-                    
-                    # --- CÁLCULO DE KELLY DINÁMICO ---
-                    kelly_result = gestor_riesgo.calcular_kelly_dinamico(
-                        prob=prob_modelo_numerico,
-                        cuota=cuota_numerico,
-                        bankroll=bankroll,
-                        metrics=metrics_kelly
-                    )
-                    
-                    # --- BACKTEST SINTÉTICO ---
-                    backtest_result = backtester.generar_escenarios(
-                        prob=prob_modelo_numerico,
-                        cuota=cuota_numerico,
-                        bankroll_inicial=bankroll,
-                        n_apuestas=100,
-                        n_simulaciones=2000
-                    )
-                    
-                    # --- AGREGAR RECOMENDACIÓN ---
-                    recomendaciones.append({
-                        "resultado": r.get("Resultado", "N/A"),
-                        "ev": r.get("EV", "0%"),
-                        "kelly_pct": kelly_result.get("stake_pct", 0),
-                        "stake_abs": kelly_result.get("stake_abs", 0),
-                        "cvar": simulacion_cvar.get("cvar", 0.15),
-                        "sharpe_esperado": backtest_result["metricas"].get("sharpe_promedio", 0),
-                        "prob_profit": backtest_result["metricas"].get("prob_profit", 0),
-                        "max_dd_promedio": backtest_result["metricas"].get("max_dd_promedio", 0),
-                        "backtest_metrics": backtest_result["metricas"],
-                        "razon_kelly": kelly_result.get("razon", "Sin información"),
-                        "prob_modelo_numerico": prob_modelo_numerico,
-                        "cuota_numerico": cuota_numerico,
-                        "ev_numerico": ev_numerico
-                    })
-                    
-                except Exception as e:
-                    st.warning(f"⚠️ Error procesando pick {r.get('Resultado', 'N/A')}: {str(e)}")
-                    continue
-            
-            return recomendaciones
         
-            picks_con_valor = convertir_datos_python(picks_con_valor)
-
-        def mostrar_recomendaciones(recomendaciones, roi_target=12):
-            """
-            Muestra las recomendaciones de apuesta en Streamlit
-            """
+        # ============ FASE 4: GESTIÓN DE CAPITAL ============
+        if 'fase4' in dm:
+            f4 = dm['fase4']
+            inputs = dm['inputs']
+            
+            st.subheader("💰 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
+            
+            recomendaciones = f4['recomendaciones']
+            bankroll = f4['bankroll']
+            
             if not recomendaciones:
-                st.info("📊 No se generaron recomendaciones de apuesta")
-                return
-            
-            st.subheader("🎰 RECOMENDACIONES DE APUESTA")
-            
-            for rec in recomendaciones:
-                # Solo mostrar picks con stake > 0%
-                if rec.get("kelly_pct", 0) > 0:
-                    with st.expander(
-                        f"✅ **{rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
-                        expanded=True
-                    ):
-                        col1, col2, col3 = st.columns(3)
-                        
-                        with col1:
-                            st.metric("💰 Stake Recomendado", f"€{rec['stake_abs']:.0f}")
-                            st.metric("📊 % Bankroll", f"{rec['kelly_pct']:.2f}%")
-                        
-                        with col2:
-                            st.metric("⚠️ CVaR Estimado", f"{rec['cvar']:.2%}")
-                            st.metric("📈 Sharpe Esperado", f"{rec['sharpe_esperado']:.2f}")
-                        
-                        with col3:
-                            st.metric("🎯 Prob. Profit", f"{rec['prob_profit']:.1%}")
-                            st.metric("📉 Max DD Esperado", f"{rec['max_dd_promedio']:.1%}")
-                        
-                        # Mostrar detalles del cálculo
-                        with st.expander("📊 Detalles del cálculo", expanded=False):
-                            st.write(f"**Probabilidad del modelo:** {rec['prob_modelo_numerico']:.2%}")
-                            st.write(f"**Cuota:** {rec['cuota_numerico']:.2f}")
-                            st.write(f"**EV numérico:** {rec['ev_numerico']:.2%}")
-                            if rec.get("razon_kelly"):
-                                st.write(f"**Razón del cálculo:** {rec['razon_kelly']}")
-                        
-                        # Gráfico de distribución de retornos
-                        if rec.get('backtest_metrics', {}).get('distribucion_retornos'):
-                            fig_dist = go.Figure()
-                            fig_dist.add_trace(go.Histogram(
-                                x=rec['backtest_metrics']['distribucion_retornos'],
-                                nbinsx=50,
-                                name="Distribución Retornos",
-                                marker_color='#636EFA'
-                            ))
-                            
-                            fig_dist.add_vline(x=0, line_dash="dash", line_color="red", 
-                                            annotation_text="Break-even")
-                            fig_dist.add_vline(x=roi_target/100, line_dash="dash", line_color="green", 
-                                            annotation_text=f"Target {roi_target}%")
-                            
-                            fig_dist.update_layout(
-                                title="📊 Distribución de Retornos Simulados (100 apuestas)",
-                                xaxis_title="Retorno Total",
-                                yaxis_title="Frecuencia",
-                                height=400
-                            )
-                            
-                            st.plotly_chart(fig_dist, use_container_width=True)
-                
-                # Mostrar picks rechazados (opcional para debugging)
-                elif st.session_state.get('debug_mode', False):
-                    st.warning(f"❌ **{rec['resultado']}** - EV: {rec['ev']} - Stake: 0% - Razón: {rec.get('razon_kelly', 'No calculado')}")
-                
-        with st.spinner("💰 CALCULANDO GESTIÓN DE CAPITAL..."):
-            st.subheader("🎯 FASE 4: GESTIÓN DE CAPITAL (KELLY DINÁMICO)")
-            
-            # 🔴 DEBUG: AÑADIR AQUÍ - VERIFICAR PICKS
-            st.write(f"DEBUG: picks_con_valor = {st.session_state.get('picks_con_valor', [])}")
-            
-            # Obtener picks de la Fase 3
-            picks_con_valor = st.session_state.get('picks_con_valor', [])
-            
-            if not picks_con_valor:
-                st.warning("⚠️ No hay picks con valor - Saltando Fase 4")
-        
-            recomendaciones = []
-            
-            
-            # Configurar bankroll
-            bankroll = st.session_state.get('bankroll_actual', 1000.0)
-            
-             # Mostrar bankroll actual
-            col_bank1, col_bank2 = st.columns(2)
-            with col_bank1:
-                st.metric("💵 Bankroll Actual", f"€{bankroll:,.2f}")
-            with col_bank2:
-                # Calcular stake total recomendado
-                stake_total = 0
-                   
-            # Ejecutar fase 4
-        try:
-            # Primero verificamos si hay picks con valor
-            if picks_con_valor and len(picks_con_valor) > 0:
-                recomendaciones = ejecutar_fase_4(
-                    picks_con_valor, 
-                    gestor_riesgo, 
-                    backtester, 
-                    bankroll,  # ← Usar bankroll dinámico
-                    posterior_local,
-                    posterior_visitante,
-                    entropia_auto,
-                    roi_target
-                )
-                
-                # 🔴🔴🔴 AGREGAR: Calcular y mostrar stake total
-                if recomendaciones:
-                    stake_total = sum([r.get('stake_abs', 0) for r in recomendaciones])
-                    st.info(f"📊 **Stake Total Recomendado:** €{stake_total:,.2f} ({stake_total/bankroll*100:.1f}% del bankroll)")
-                    
-                    # Advertencia si se apuesta mucho
-                    if stake_total > bankroll * 0.25:  # Más del 25%
-                        st.warning("⚠️ **ALERTA:** Estás apostando más del 25% de tu bankroll. Considera reducir stakes.")
-                # Mostrar recomendaciones si las hay
-                if recomendaciones and len(recomendaciones) > 0:
-                    mostrar_recomendaciones(recomendaciones, roi_target)
-                else:
-                    st.info("📭 No hay picks con valor para gestionar capital")
-                    recomendaciones = []  # Asegurar lista vacía
-                    
-            else:
                 st.info("📭 No hay picks con valor para gestionar capital")
-                recomendaciones = []  # Asegurar lista vacía
-                
-        except Exception as e:
-            st.error(f"❌ Error en Fase 4: {str(e)}")
-            st.info("Continuando con Fase 5 sin recomendaciones...")
-            recomendaciones = []  # Asegurar lista vacía en caso de error
-    
-        # 🔴🔴🔴 GUARDAR PARA FASE 5 🔴🔴🔴
-        st.session_state['recomendaciones_fase4'] = recomendaciones
-        
-        with st.spinner("📊 GENERANDO REPORTE FINAL..."):
-            st.subheader("🎯 FASE 5: REPORTE DE RIESGO Y PERFORMANCE")
-            
-            # 🔴🔴🔴 OBTENER RECOMENDACIONES DE SESSION_STATE 🔴🔴🔴
-            recomendaciones = st.session_state.get('recomendaciones_fase4', [])
-            st.write(f"DEBUG FASE 5: Recomendaciones = {recomendaciones}, Tipo = {type(recomendaciones)}")
-            
-            # Inicializar variables
-            ev_promedio = 0
-            sharpe_promedio = 0
-            cvar_promedio = 0
-            prob_profit_promedio = 0
-            objetivos_cumplidos = []
-            
-            # Calcular métricas agregadas
-            if recomendaciones:  # Cambié esto - verifica directamente la lista
-                try:
-                    # Convertir todos los valores EV a float
-                    ev_valores = []
-                    for r in recomendaciones:
-                        try:
-                            if isinstance(r['ev'], str):
-                                # Convertir "5.2%" a 0.052
-                                ev_str = r['ev'].replace('%', '').strip()
-                                ev_valores.append(float(ev_str) / 100)
-                            else:
-                                ev_valores.append(float(r['ev']))
-                        except (ValueError, KeyError) as e:
-                            st.warning(f"Error procesando EV: {e}, usando 0")
-                            ev_valores.append(0.0)
-                    
-                    # Asegurar que tenemos valores
-                    if ev_valores:
-                        ev_promedio = np.mean(ev_valores)
-                        sharpe_promedio = np.mean([r.get('sharpe_esperado', 0) for r in recomendaciones])
-                        cvar_promedio = np.mean([r.get('cvar', 0.15) for r in recomendaciones])
-                        prob_profit_promedio = np.mean([r.get('prob_profit', 0) for r in recomendaciones])
-                        
-                        # Verificar objetivos
-                        objetivos_cumplidos = []
-                        if ev_promedio * 100 >= roi_target * 0.8:  # 80% del target
-                            objetivos_cumplidos.append("ROI")
-                        if cvar_promedio <= cvar_target/100:
-                            objetivos_cumplidos.append("CVaR")
-                        if sharpe_promedio >= sharpe_min:
-                            objetivos_cumplidos.append("Sharpe")
-                    else:
-                        st.info("No se pudieron calcular métricas de EV")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error calculando métricas: {str(e)}")
             else:
-                st.info("📭 No hay recomendaciones disponibles para calcular métricas")
+                # Mostrar stake total
+                stake_total = sum([r.get('stake_abs', 0) for r in recomendaciones])
+                st.info(f"📊 **Stake Total Recomendado:** €{stake_total:,.2f} ({stake_total/bankroll*100:.1f}% del bankroll)")
+                
+                if stake_total > bankroll * 0.25:
+                    st.warning("⚠️ **ALERTA:** Estás apostando más del 25% de tu bankroll. Considera reducir stakes.")
+                
+                # Mostrar cada recomendación
+                for rec in recomendaciones:
+                    if rec.get("kelly_pct", 0) > 0:
+                        with st.expander(
+                            f"✅ **{rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
+                            expanded=True
+                        ):
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.metric("💰 Stake Recomendado", f"€{rec['stake_abs']:.0f}")
+                                st.metric("📊 % Bankroll", f"{rec['kelly_pct']:.2f}%")
+                            
+                            with col2:
+                                st.metric("⚠️ CVaR Estimado", f"{rec['cvar']:.2%}")
+                                st.metric("📈 Sharpe Esperado", f"{rec['sharpe_esperado']:.2f}")
+                            
+                            with col3:
+                                st.metric("🎯 Prob. Profit", f"{rec['prob_profit']:.1%}")
+                                st.metric("📉 Max DD Esperado", f"{rec['max_dd_promedio']:.1%}")
+                            
+                            # Gráfico de distribución
+                            if rec.get('backtest_metrics', {}).get('distribucion_retornos'):
+                                fig_dist = go.Figure()
+                                fig_dist.add_trace(go.Histogram(
+                                    x=rec['backtest_metrics']['distribucion_retornos'],
+                                    nbinsx=50,
+                                    name="Distribución Retornos",
+                                    marker_color='#636EFA'
+                                ))
+                                
+                                fig_dist.add_vline(x=0, line_dash="dash", line_color="red", 
+                                                annotation_text="Break-even")
+                                fig_dist.add_vline(x=dm['fase5']['roi_target']/100, line_dash="dash", 
+                                                line_color="green", annotation_text=f"Target {dm['fase5']['roi_target']}%")
+                                
+                                fig_dist.update_layout(
+                                    title="📊 Distribución de Retornos Simulados (100 apuestas)",
+                                    xaxis_title="Retorno Total",
+                                    yaxis_title="Frecuencia",
+                                    height=400
+                                )
+                                st.plotly_chart(fig_dist, use_container_width=True)
+        
+        # ============ FASE 5: MÉTRICAS DE PERFORMANCE ============
+        if 'fase5' in dm:
+            f5 = dm['fase5']
             
-            # 🔴🔴🔴 CORRECCIÓN: CREAR COLUMNAS FUERA DEL IF/ELSE 🔴🔴🔴
-            # Esto asegura que las columnas siempre existan
+            st.subheader("📊 FASE 5: REPORTE DE RIESGO Y PERFORMANCE")
+            
             col_obj1, col_obj2, col_obj3, col_obj4 = st.columns(4)
-
+            
             with col_obj1:
-                color_text = "🟢" if ev_promedio * 100 >= roi_target * 0.8 else "🟠"
-                st.metric(f"ROI Esperado {color_text}", f"{ev_promedio:.2%}")
-                st.caption(f"Target: {roi_target}%")
-
+                color_text = "🟢" if f5['ev_promedio'] * 100 >= f5['roi_target'] * 0.8 else "🟠"
+                st.metric(f"ROI Esperado {color_text}", f"{f5['ev_promedio']:.2%}")
+                st.caption(f"Target: {f5['roi_target']}%")
+            
             with col_obj2:
-                color_text = "🟢" if cvar_promedio <= cvar_target/100 else "🔴"
-                st.metric(f"CVaR Estimado {color_text}", f"{cvar_promedio:.2%}")
-                st.caption(f"Máx: {cvar_target}%")
-
+                color_text = "🟢" if f5['cvar_promedio'] <= f5['cvar_target']/100 else "🔴"
+                st.metric(f"CVaR Estimado {color_text}", f"{f5['cvar_promedio']:.2%}")
+                st.caption(f"Máx: {f5['cvar_target']}%")
+            
             with col_obj3:
-                color_text = "🟢" if sharpe_promedio >= sharpe_min else "🟠"
-                st.metric(f"Sharpe Esperado {color_text}", f"{sharpe_promedio:.2f}")
-                st.caption(f"Mín: {sharpe_min}")
-
+                color_text = "🟢" if f5['sharpe_promedio'] >= f5['sharpe_min'] else "🟠"
+                st.metric(f"Sharpe Esperado {color_text}", f"{f5['sharpe_promedio']:.2f}")
+                st.caption(f"Mín: {f5['sharpe_min']}")
+            
             with col_obj4:
-                st.metric("Prob. Éxito", f"{prob_profit_promedio:.1%}")
+                st.metric("Prob. Éxito", f"{f5['prob_profit_promedio']:.1%}")
                 st.caption("Probabilidad de ganar")
             
-            # 🔴🔴🔴 CORRECCIÓN: Eliminé el with col_obj4 duplicado 🔴🔴🔴
-            
             # Resumen de objetivos
+            objetivos_cumplidos = f5['objetivos_cumplidos']
             if len(objetivos_cumplidos) >= 2:
                 st.success(f"✅ **SISTEMA DENTRO DE PARÁMETROS:** {', '.join(objetivos_cumplidos)}")
             else:
                 st.warning(f"⚠️ **SISTEMA FUERA DE PARÁMETROS:** Solo {len(objetivos_cumplidos)} objetivo(s) cumplido(s)")
+        
+        # Marcar que el análisis está completo
+        st.session_state['analisis_ejecutado'] = True
+        st.rerun()  # Esto actualiza la página inmediatamente
             
             # ============ VERIFICACIÓN ============
             variables_a_verificar = {
