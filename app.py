@@ -380,6 +380,13 @@ elif menu == "🏠 App Principal":
 
     if 'historial_apuestas' not in st.session_state:
         st.session_state.historial_apuestas = []
+        
+    # Reemplazo recomendado para la línea de inicio:
+    if 'entropia_mercado' not in st.session_state:
+        st.session_state.entropia_mercado = 0.620
+
+    # Y en tu slider, asegúrate de usar:
+    # entropia_mercado = st.sidebar.slider(..., value=st.session_state.entropia_mercado)
     
     # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
     
