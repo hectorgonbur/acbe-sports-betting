@@ -373,6 +373,13 @@ elif menu == "🏠 App Principal":
     if 'mostrar_resultados' not in st.session_state:
         st.session_state['mostrar_resultados'] = False
         
+    # === AÑADE ESTAS DOS LÍNEAS CRÍTICAS AQUÍ ===
+    if 'analisis_ejecutado' not in st.session_state:
+        st.session_state['analisis_ejecutado'] = False
+    if 'datos_maestros' not in st.session_state:
+        st.session_state['datos_maestros'] = {} 
+    # ============================================
+        
     # ============ INICIALIZACIÓN DEL BANKROLL ============
     if 'bankroll_actual' not in st.session_state:
         st.session_state.bankroll_actual = 1000.0
@@ -1849,10 +1856,30 @@ elif menu == "🏠 App Principal":
             carga_fisica_a = st.slider("Carga física", 0.5, 1.5, 1.1, step=0.05, key="cf_a")
 
     # ============ EJECUCIÓN DEL SISTEMA ============
-    # BOTÓN PRINCIPAL CON KEY ÚNICA
     st.sidebar.markdown("---")
-    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary"):
-        st.session_state['mostrar_resultados'] = True  
+    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", key="btn_run_39k"):
+        with st.spinner("🔬 Procesando Motor ACBE..."):
+            # 1. Crear el cerebro
+            modelo_bayes = ModeloBayesianoJerarquico(liga)
+            
+            # 2. Calcular la Fase 1
+            post_h = modelo_bayes.inferencia_variacional({"goles_anotados": g_h_ult10, "n_partidos": 10, "xG": xg_h_prom}, es_local=True)
+            post_a = modelo_bayes.inferencia_variacional({"goles_anotados": g_a_ult10, "n_partidos": 10, "xG": xg_a_prom}, es_local=False)
+            
+            # 3. GUARDAR TODO EN LA MALETA (Aquí se acaba el NameError)
+            st.session_state['datos_maestros'] = {
+                'post_h': post_h,
+                'post_a': post_a,
+                'equipo_h': team_h,
+                'equipo_a': team_a,
+                'cuotas': [c1, cx, c2],
+                'or_val': or_val,
+                'timestamp': datetime.now()
+            }
+            st.session_state['analisis_ejecutado'] = True
+            
+            st.sidebar.success("✅ Análisis completado")
+            st.rerun() # <--- OBLIGATORIO: Fuerza a la app a ver los resultados
         
         # 🔴 DEBUG: AÑADIR AQUÍ - VERIFICAR QUE TODO SE EJECUTA
         st.write("DEBUG: Botón ejecutar presionado")
@@ -1919,6 +1946,10 @@ elif menu == "🏠 App Principal":
             st.sidebar.success("Parámetros cargados. Presiona 'EJECUTAR ANÁLISIS COMPLETO'")
             st.session_state['cargar_ultimo_analisis'] = True
             st.rerun()
+        
+        # === ESTE IF ES EL INTERRUPTOR QUE ENCIENDE LOS RESULTADOS ===
+        if st.session_state.get('analisis_ejecutado', False):
+            dm = st.session_state['datos_maestros']
             
             # ============ FASE 0: VALIDACIÓN DE MERCADO ============
             with st.spinner("🔍 Validando condiciones del mercado..."):
