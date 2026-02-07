@@ -1884,7 +1884,7 @@ elif menu == "🏠 App Principal":
             'overround': or_val,
             'volumen_estimado': volumen_estimado,
             'steam_detectado': steam_detectado,
-            'entropia_mercado': entropia_mercado,
+            'entropia_mercado': float(entropia_mercado) if 'entropia_mercado' in locals() else 0.620,
             'liga': liga
         }
         # ============ INICIALIZAR COMPONENTES ============
