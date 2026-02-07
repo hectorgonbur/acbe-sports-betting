@@ -368,6 +368,11 @@ elif menu == "🏠 App Principal":
     from datetime import datetime, timedelta
     import uuid  # Añadir esto
     
+    if 'entropia_mercado' not in st.session_state:
+        st.session_state['entropia_mercado'] = 0.620
+    if 'mostrar_resultados' not in st.session_state:
+        st.session_state['mostrar_resultados'] = False
+        
     # ============ INICIALIZACIÓN DEL BANKROLL ============
     if 'bankroll_actual' not in st.session_state:
         st.session_state.bankroll_actual = 1000.0
@@ -380,14 +385,7 @@ elif menu == "🏠 App Principal":
 
     if 'historial_apuestas' not in st.session_state:
         st.session_state.historial_apuestas = []
-        
-    # Reemplazo recomendado para la línea de inicio:
-    if 'entropia_mercado' not in st.session_state:
-        st.session_state.entropia_mercado = 0.620
 
-    # Y en tu slider, asegúrate de usar:
-    # entropia_mercado = st.sidebar.slider(..., value=st.session_state.entropia_mercado)
-    
     # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
     
     # Función para debuggear widgets duplicados
@@ -1725,6 +1723,14 @@ elif menu == "🏠 App Principal":
     # Ya lo hace la función, pero por si acaso:
     c1_f, cx_f, c2_f = float(c1), float(cx), float(c2)
     or_val = (1/c1_f + 1/cx_f + 1/c2_f) - 1
+    
+    # Slider de Entropía vinculado a la sesión
+    entropia_mercado = st.sidebar.slider(
+        "Entropía (H)", 0.3, 0.9, 
+        value=st.session_state['entropia_mercado'], 
+        key="ent_slider_v3"
+    )
+    st.session_state['entropia_mercado'] = entropia_mercado # Guardar cambio
 
     # ============ FUNCIÓN DE FORMATEO SEGURO ============
     def formatear_porcentaje_seguro(valor):
@@ -1752,7 +1758,7 @@ elif menu == "🏠 App Principal":
     with col_met1:
         # Formateamos el texto ANTES de pasarlo a st.metric
         texto_overround = f"{or_val_limpio * 100:.2f}%"
-        st.metric(label="Overround", value=texto_overround)  
+        st.metric("Overround", f"{or_val*100:.2f}%") 
 
     with col_met2:
         # Cálculo seguro de margen
@@ -1765,7 +1771,7 @@ elif menu == "🏠 App Principal":
     with col_met3:
         # Asegurar que entropía sea float
         ent_val = float(entropia_mercado) if 'entropia_mercado' in locals() else 0.620
-        st.metric("Entropía", f"{ent_val:.3f}")
+        st.metric("Entropía", f"{entropia_mercado:.3f}")
         
     if or_val > 0.07:
         st.sidebar.warning(f"⚠️ Overround Alto ({or_val:.2%}). El Stake Kelly será penalizado.")
@@ -1845,8 +1851,8 @@ elif menu == "🏠 App Principal":
     # ============ EJECUCIÓN DEL SISTEMA ============
     # BOTÓN PRINCIPAL CON KEY ÚNICA
     st.sidebar.markdown("---")
-    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary", 
-                        use_container_width=True, key="ejecutar_analisis_btn"):  
+    if st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", type="primary"):
+        st.session_state['mostrar_resultados'] = True  
         
         # 🔴 DEBUG: AÑADIR AQUÍ - VERIFICAR QUE TODO SE EJECUTA
         st.write("DEBUG: Botón ejecutar presionado")
@@ -1885,8 +1891,9 @@ elif menu == "🏠 App Principal":
             'volumen_estimado': volumen_estimado,
             'steam_detectado': steam_detectado,
             'entropia_mercado': float(entropia_mercado) if 'entropia_mercado' in locals() else 0.620,
-            'liga': liga
+            'liga': liga       
         }
+        
         # ============ INICIALIZAR COMPONENTES ============
         with st.spinner("🔬 Inicializando modelo bayesiano jerárquico..."):
             modelo_bayes = ModeloBayesianoJerarquico(liga)
@@ -2169,6 +2176,15 @@ elif menu == "🏠 App Principal":
             # 🔴🔴🔴 AQUÍ VA LA LÍNEA QUE PREGUNTAS 🔴🔴🔴
             # =============================================
             st.session_state['picks_con_valor'] = picks_con_valor  # ← JUSTO AQUÍ
+            
+            st.session_state['analisis_completo'] = {
+                'team_h': team_h,
+                'team_a': team_a,
+                'or_val': or_val,
+                'entropia': st.session_state.get('entropia_mercado', 0.620), 
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            # ==============================================================
             
             if picks_con_valor:
                 st.success(f"✅ **{len(picks_con_valor)} INEFICIENCIA(S) DETECTADA(S)**")
