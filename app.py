@@ -1620,14 +1620,16 @@ elif menu == "🏠 App Principal":
     # --- BARRA LATERAL: CONFIGURACIÓN AVANZADA ---
     st.sidebar.header("⚙️ CONFIGURACIÓN DEL SISTEMA")
 
+    # --- UNIFICACIÓN PROFESIONAL DE PARÁMETROS ---
     with st.sidebar.expander("🎯 OBJETIVOS DE PERFORMANCE", expanded=True):
         col_obj1, col_obj2 = st.columns(2)
         with col_obj1:
-            roi_target = st.slider("ROI Target (%)", 5, 25, 12, key="roi_target_slider")
-            cvar_target = st.slider("CVaR Máximo (%)", 5, 25, 15, key="cvar_target_slider")
+            # Dividimos entre 100 para que la matemática del Kelly (0.12) sea correcta
+            roi_target = st.slider("ROI Target (%)", 5, 25, 12, key="roi_target_main") / 100
+            cvar_target = st.slider("CVaR Máximo (%)", 5, 25, 15, key="cvar_target_main") / 100
         with col_obj2:
-            max_dd = st.slider("Max Drawdown (%)", 10, 40, 20, key="max_dd_slider")
-            sharpe_min = st.slider("Sharpe Mínimo", 0.5, 3.0, 1.5, key="sharpe_min_slider")
+            max_dd = st.slider("Max Drawdown (%)", 10, 40, 20, key="max_dd_main") / 100
+            sharpe_min = st.slider("Sharpe Mínimo", 0.5, 3.0, 1.50, key="sharpe_min_main")
         
         st.markdown("---")
         st.markdown(f"""
@@ -1773,13 +1775,6 @@ elif menu == "🏠 App Principal":
         st.sidebar.success("💎 Arbitraje detectado (Surebet potencial)")
     
     st.sidebar.markdown("---") # Separador visual pro
-
-    # --- PARÁMETROS DE RIESGO ---
-    st.sidebar.header("🎯 PARÁMETROS DE RIESGO")
-    roi_target = st.sidebar.slider("ROI Target (%)", 0.0, 20.0, 10.0, step=0.5, key="roi_target_sidebar") / 100.0
-    cvar_target = st.sidebar.slider("CVaR Target (%)", 0.0, 10.0, 5.0, step=0.5, key="cvar_target_sidebar") / 100.0
-    max_dd = st.sidebar.slider("Max Drawdown (%)", 0.0, 30.0, 15.0, step=0.5, key="max_dd_sidebar") / 100.0
-    sharpe_min = st.sidebar.slider("Sharpe Mínimo", 0.0, 3.0, 1.0, step=0.1, key="sharpe_min_sidebar")
 
     # Selector de liga - ⚠️ SOLO UNO! - ELIMINAR EL OTRO
     liga = st.sidebar.selectbox("Liga", ["Serie A", "Premier League", "La Liga", "Bundesliga", "Ligue 1"], 
