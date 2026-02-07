@@ -400,13 +400,13 @@ elif menu == "🏠 App Principal":
     # ============ FUNCIONES DE GESTIÓN DE BANKROLL ============
     
     def convertir_datos_python(obj):
-    if isinstance(obj, np.integer): return int(obj)
-    if isinstance(obj, np.floating): return float(obj)
-    if isinstance(obj, np.ndarray): return obj.tolist()
-    if isinstance(obj, dict): return {k: convertir_datos_python(v) for k, v in obj.items()}
-    if isinstance(obj, list): return [convertir_datos_python(x) for x in obj]
-    return obj
-    
+        if isinstance(obj, np.integer): return int(obj)
+        if isinstance(obj, np.floating): return float(obj)
+        if isinstance(obj, np.ndarray): return obj.tolist()
+        if isinstance(obj, dict): return {k: convertir_datos_python(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [convertir_datos_python(x) for x in obj]
+        return obj
+        
     # Función para debuggear widgets duplicados
     def verificar_widgets():
         if 'debug_mode' not in st.session_state:
