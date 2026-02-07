@@ -1655,13 +1655,10 @@ elif menu == "🏠 App Principal":
 
     # --- SECCIÓN MERCADO Y CUOTAS ---
     st.sidebar.header("💰 MERCADO")
-    col_c1, col_c2, col_c3 = st.sidebar.columns(3)
-    with col_c1:
-        c1 = st.number_input("1", value=2.90, min_value=1.01, step=0.01, key="cuota1_input")
-    with col_c2:
-        cx = st.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cuotax_input")
-    with col_c3:
-        c2 = st.number_input("2", value=2.45, min_value=1.01, step=0.01, key="cuota2_input")
+    c_col1, c_col2, c_col3 = st.sidebar.columns(3)
+    c1 = c_col1.number_input("1", value=2.90, min_value=1.01, step=0.01, key="c1_input_pro")
+    cx = c_col2.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cx_input_pro")
+    c2 = c_col3.number_input("2", value=2.45, min_value=1.01, step=0.01, key="c2_input_pro")
 
     st.sidebar.markdown("---")
     st.sidebar.header("📈 MÉTRICAS DE MERCADO")
@@ -1702,7 +1699,8 @@ elif menu == "🏠 App Principal":
 
     # ============ GARANTIZAR QUE or_val SEA FLOAT ============
     # Ya lo hace la función, pero por si acaso:
-    or_val = float(or_val) if isinstance(or_val, (int, float)) else 0.0
+    c1_f, cx_f, c2_f = float(c1), float(cx), float(c2)
+    or_val = (1/c1_f + 1/cx_f + 1/c2_f) - 1
 
     # ============ FUNCIÓN DE FORMATEO SEGURO ============
     def formatear_porcentaje_seguro(valor):
@@ -1715,8 +1713,8 @@ elif menu == "🏠 App Principal":
         except (ValueError, TypeError):
             return "0.00%"
 
-    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="volumen_slider")
-    steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider")
+    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="vol_slider_v3")
+    steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider_v3")
 
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
     
@@ -1729,7 +1727,7 @@ elif menu == "🏠 App Principal":
             texto = "0.00%"
             
         # Usar delta=None para evitar problemas
-        st.metric(label="Overround", value=texto, delta=None, key="or_metric_unique_123")   
+        st.metric(label="Overround", value=f"{or_val*100:.2f}%", key="metric_overround_final")  
 
     with col_met2:
         # Calcular margen de manera segura
@@ -1742,11 +1740,20 @@ elif menu == "🏠 App Principal":
         except Exception:
             margen_formateado = "0.0%"
         
-        st.metric("Margen Casa", margen_formateado, key="margen_metric")
+        st.metric("Margen Casa", f"{margen:.1f}%", key="metric_margen_final")
 
     with col_met3:
-        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, step=0.01, key="entropia_slider")
-        st.metric("Entropía", f"{float(entropia_mercado):.3f}", key="entropia_metric")
+        entropia_mercado = st.sidebar.slider("Entropía (H)", 0.3, 0.9, 0.62, key="ent_slider_final")
+        st.metric("Entropía", f"{entropia_mercado:.3f}", key="metric_ent_final")
+        
+    if or_val > 0.07:
+        st.sidebar.warning(f"⚠️ Overround Alto ({or_val:.2%}). El Stake Kelly será penalizado.")
+    elif or_val < 0.01 and or_val > -0.01:
+        st.sidebar.info("⚖️ Mercado Equilibrado")
+    elif or_val < 0:
+        st.sidebar.success("💎 Arbitraje detectado (Surebet potencial)")
+    
+    st.sidebar.markdown("---") # Separador visual pro
 
     # --- PARÁMETROS DE RIESGO ---
     st.sidebar.header("🎯 PARÁMETROS DE RIESGO")
