@@ -2414,59 +2414,59 @@ elif menu == "🏠 App Principal":
         st.session_state['analisis_ejecutado'] = True
         st.rerun()  # Esto actualiza la página inmediatamente
             
-            # ============ VERIFICACIÓN ============
-            variables_a_verificar = {
-                'resultados_analisis': resultados_analisis,
-                'analisis_completo': analisis_completo,
-                'picks_con_valor': picks_con_valor,
+         # ============ VERIFICACIÓN ============
+        variables_a_verificar = {
+            'resultados_analisis': resultados_analisis,
+            'analisis_completo': analisis_completo,
+            'picks_con_valor': picks_con_valor,
                 'recomendaciones': recomendaciones,
+         }
+
+        for nombre, variable in variables_a_verificar.items():
+            if variable is None:
+                st.error(f"Error: La variable '{nombre}' no tiene un valor válido.")
+                st.stop()
+
+        # ============ GUARDAR TODO EN SESSION_STATE ============
+        st.session_state['analisis_ejecutado'] = True
+        st.session_state['analisis_timestamp'] = datetime.now()
+        st.session_state['datos_analisis'] = {
+            'resultados_analisis': resultados_analisis,
+            'analisis_completo': analisis_completo,
+            'picks_con_valor': picks_con_valor,
+            'recomendaciones_fase4': recomendaciones,
+            'team_h': team_h,
+            'team_a': team_a,
+            'liga': liga,
+            'cuotas': {'1': c1, 'X': cx, '2': c2},
+            'parametros': {
+                'roi_target': roi_target,
+                'cvar_target': cvar_target,
+                 'max_dd': max_dd,
+                'sharpe_min': sharpe_min
             }
+        } 
 
-            for nombre, variable in variables_a_verificar.items():
-                if variable is None:
-                    st.error(f"Error: La variable '{nombre}' no tiene un valor válido.")
-                    st.stop()
+        # También guardar los datos de entrada para poder reusarlos
+        st.session_state['inputs_analisis'] = {
+            'team_h': team_h, 'team_a': team_a,
+            'g_h_ult10': g_h_ult10, 'g_a_ult10': g_a_ult10,
+            'xg_h_prom': xg_h_prom, 'xg_a_prom': xg_a_prom,
+            'g_h_ult5': g_h_ult5, 'g_a_ult5': g_a_ult5,
+            'tiros_arco_h': tiros_arco_h, 'tiros_arco_a': tiros_arco_a,
+            'posesion_h': posesion_h, 'precision_pases_h': precision_pases_h,
+            'precision_pases_a': precision_pases_a, 'goles_rec_h': goles_rec_h,
+            'goles_rec_a': goles_rec_a, 'xg_contra_h': xg_contra_h,
+            'xg_contra_a': xg_contra_a, 'entradas_h': entradas_h,
+            'entradas_a': entradas_a, 'recuperaciones_h': recuperaciones_h,
+            'recuperaciones_a': recuperaciones_a, 'delta_h': delta_h,
+            'delta_a': delta_a, 'motivacion_h': motivacion_h,
+            'motivacion_a': motivacion_a, 'carga_fisica_h': carga_fisica_h,
+            'carga_fisica_a': carga_fisica_a, 'cuotas': {'1': c1, 'X': cx, '2': c2}
+        }
 
-            # ============ GUARDAR TODO EN SESSION_STATE ============
-            st.session_state['analisis_ejecutado'] = True
-            st.session_state['analisis_timestamp'] = datetime.now()
-            st.session_state['datos_analisis'] = {
-                'resultados_analisis': resultados_analisis,
-                'analisis_completo': analisis_completo,
-                'picks_con_valor': picks_con_valor,
-                'recomendaciones_fase4': recomendaciones,
-                'team_h': team_h,
-                'team_a': team_a,
-                'liga': liga,
-                'cuotas': {'1': c1, 'X': cx, '2': c2},
-                'parametros': {
-                    'roi_target': roi_target,
-                    'cvar_target': cvar_target,
-                    'max_dd': max_dd,
-                    'sharpe_min': sharpe_min
-                }
-            }
-
-            # También guardar los datos de entrada para poder reusarlos
-            st.session_state['inputs_analisis'] = {
-                'team_h': team_h, 'team_a': team_a,
-                'g_h_ult10': g_h_ult10, 'g_a_ult10': g_a_ult10,
-                'xg_h_prom': xg_h_prom, 'xg_a_prom': xg_a_prom,
-                'g_h_ult5': g_h_ult5, 'g_a_ult5': g_a_ult5,
-                'tiros_arco_h': tiros_arco_h, 'tiros_arco_a': tiros_arco_a,
-                'posesion_h': posesion_h, 'precision_pases_h': precision_pases_h,
-                'precision_pases_a': precision_pases_a, 'goles_rec_h': goles_rec_h,
-                'goles_rec_a': goles_rec_a, 'xg_contra_h': xg_contra_h,
-                'xg_contra_a': xg_contra_a, 'entradas_h': entradas_h,
-                'entradas_a': entradas_a, 'recuperaciones_h': recuperaciones_h,
-                'recuperaciones_a': recuperaciones_a, 'delta_h': delta_h,
-                'delta_a': delta_a, 'motivacion_h': motivacion_h,
-                'motivacion_a': motivacion_a, 'carga_fisica_h': carga_fisica_h,
-                'carga_fisica_a': carga_fisica_a, 'cuotas': {'1': c1, 'X': cx, '2': c2}
-            }
-
-            st.success("✅ Análisis completado y guardado en memoria")
-            st.rerun()
+        st.success("✅ Análisis completado y guardado en memoria")
+        st.rerun()       
         
         # ============ SECCIÓN SIEMPRE VISIBLE: REGISTRO DE APUESTAS ============
         st.markdown("---")
