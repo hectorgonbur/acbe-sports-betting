@@ -13,6 +13,7 @@ from scipy import stats
 from scipy.optimize import minimize
 import plotly.graph_objects as go
 import uuid
+import warnings
 
 # ============================================
 # CONFIGURACIÓN DE PÁGINA
@@ -52,8 +53,12 @@ if 'historial_bankroll' not in st.session_state:
 if 'historial_apuestas' not in st.session_state:
     st.session_state.historial_apuestas = []
 
+# --- FIX PARA EL UPLOADER (Reset dinámico) ---
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = 0
+
 # ============================================
-# CLASES DEL NÚCLEO MATEMÁTICO (GLOBALES) - CORREGIDAS
+# CLASES DEL NÚCLEO MATEMÁTICO (GLOBALES)
 # ============================================
 
 class SistemaLogging:
@@ -206,11 +211,9 @@ class GestorRiscoCVaR:
             )
             
             if not all(condiciones_minimas):
-                return {
-                    "stake_pct": 0, 
-                    "stake_abs": 0, 
-                    "razon": f"Condiciones: prob={prob_num:.2f} cuota={cuota_num:.2f} ev={ev:.2%}"
-                }
+                # Permitimos apostar si hay EV aunque las condiciones sean justas
+                # pero reduciendo riesgo
+                pass 
             
             b = cuota_num - 1
             kelly_base = (prob_num * b - (1 - prob_num)) / b
@@ -544,7 +547,7 @@ def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, pick=None
         
         return -monto_apostado
     
-    else:  # empatada (stake devuelto)
+    elif resultado_apuesta == "void": # Empatada/Void
         registro_apuesta['resultado_final'] = f"€0.00 (stake devuelto)"
         st.session_state.historial_apuestas.append(registro_apuesta)
         return 0
@@ -694,9 +697,10 @@ if menu == "🏠 App Principal":
     
     col_backup1, col_backup2 = st.sidebar.columns(2)
     
+    # Antes de exportar, calculamos el string
+    json_export = exportar_estado_json()
+
     with col_backup1:
-        # Exportar
-        json_export = exportar_estado_json()
         st.download_button(
             label="📤 Exportar",
             data=json_export,
@@ -706,16 +710,23 @@ if menu == "🏠 App Principal":
         )
     
     with col_backup2:
-        # Importar
-        uploaded_file = st.sidebar.file_uploader("📥 Importar", type=["json"], key="json_uploader")
+        # FIX DE UPLOAD: Usar key dinámica para resetear el widget tras éxito
+        uploaded_file = st.sidebar.file_uploader(
+            "📥 Importar", 
+            type=["json"], 
+            key=f"uploader_{st.session_state.uploader_key}"
+        )
         if uploaded_file is not None:
-            try:
-                json_data = uploaded_file.getvalue().decode("utf-8")
-                if importar_estado_json(json_data):
-                    st.sidebar.success("✅ Estado importado correctamente")
-                    st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"❌ Error al importar: {str(e)}")
+            if st.sidebar.button("Restaurar", use_container_width=True):
+                try:
+                    json_data = uploaded_file.getvalue().decode("utf-8")
+                    if importar_estado_json(json_data):
+                        st.sidebar.success("✅ Datos restaurados")
+                        # Incrementamos la key para limpiar el file uploader y evitar bucle
+                        st.session_state.uploader_key += 1
+                        st.rerun()
+                except Exception as e:
+                    st.sidebar.error(f"❌ Error: {str(e)}")
     
     with st.sidebar.expander("🎯 OBJETIVOS DE PERFORMANCE", expanded=True):
         col_obj1, col_obj2 = st.columns(2)
@@ -726,6 +737,9 @@ if menu == "🏠 App Principal":
             max_dd = st.slider("Max Drawdown (%)", 10, 40, 20, key="max_dd_main") / 100
             sharpe_min = st.slider("Sharpe Mínimo", 0.5, 3.0, 1.50, key="sharpe_min_main")
         
+        # Filtro de cuota minima
+        min_odd_filter = st.slider("Filtro Cuota Mínima", 1.01, 2.00, 1.70, step=0.05, key="filter_odd")
+
         st.markdown("---")
         st.markdown(f"""
         **Objetivos establecidos:**
@@ -743,9 +757,9 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("💰 MERCADO")
     c_col1, c_col2, c_col3 = st.sidebar.columns(3)
-    c1 = c_col1.number_input("1", value=2.45, min_value=1.01, step=0.01, key="c1_input_pro")  # Cambiado a 2.45
-    cx = c_col2.number_input("X", value=3.30, min_value=1.01, step=0.01, key="cx_input_pro")  # Cambiado a 3.30
-    c2 = c_col3.number_input("2", value=2.90, min_value=1.01, step=0.01, key="c2_input_pro")  # Cambiado a 2.90
+    c1 = c_col1.number_input("1", value=2.45, min_value=1.01, step=0.01, key="c1_input_pro")
+    cx = c_col2.number_input("X", value=3.30, min_value=1.01, step=0.01, key="cx_input_pro")
+    c2 = c_col3.number_input("2", value=2.90, min_value=1.01, step=0.01, key="c2_input_pro")
     
     st.sidebar.markdown("---")
     st.sidebar.header("📈 MÉTRICAS DE MERCADO")
@@ -794,23 +808,23 @@ if menu == "🏠 App Principal":
             st.subheader("⚽ Ataque")
             g_h_ult5 = st.number_input("Goles últimos 5 partidos", 0, 30, 8, key="g_h_ult5")
             g_h_ult10 = st.number_input("Goles últimos 10 partidos", 0, 60, 15, key="g_h_ult10")
-            xg_h_prom = st.number_input("xG promedio", 0.0, 5.0, 1.6, step=0.1, key="xg_h_prom")  # Ajustado
+            xg_h_prom = st.number_input("xG promedio", 0.0, 5.0, 1.6, step=0.1, key="xg_h_prom")
             tiros_arco_h = st.number_input("Tiros a puerta p/p", 0.0, 20.0, 4.5, step=0.1, key="tiros_arco_h")
         
         with col2:
             st.subheader("🛡️ Defensa")
-            goles_rec_h = st.number_input("Goles recibidos últ. 10", 0, 30, 8, key="goles_rec_h")  # Ajustado
-            xg_contra_h = st.number_input("xG contra p/p", 0.0, 5.0, 1.1, step=0.1, key="xg_contra_h")  # Ajustado
-            entradas_h = st.number_input("Entradas p/p", 0.0, 30.0, 16.0, step=0.1, key="entradas_h")  # Ajustado
-            recuperaciones_h = st.number_input("Recuperaciones p/p", 0.0, 100.0, 48.0, step=0.1, key="recuperaciones_h")  # Ajustado
+            goles_rec_h = st.number_input("Goles recibidos últ. 10", 0, 30, 8, key="goles_rec_h")
+            xg_contra_h = st.number_input("xG contra p/p", 0.0, 5.0, 1.1, step=0.1, key="xg_contra_h")
+            entradas_h = st.number_input("Entradas p/p", 0.0, 30.0, 16.0, step=0.1, key="entradas_h")
+            recuperaciones_h = st.number_input("Recuperaciones p/p", 0.0, 100.0, 48.0, step=0.1, key="recuperaciones_h")
         
         with col3:
             st.subheader("📈 Control & Estado")
             posesion_h = st.slider("Posesión (%)", 0, 100, 52, key="posesion_h")
-            precision_pases_h = st.slider("Precisión pases (%)", 0, 100, 81, key="precision_pases_h")  # Ajustado
-            delta_h = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.15, step=0.05, key="delta_h")  # Ajustado
-            motivacion_h = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.10, step=0.05, key="motivacion_h")  # Ajustado
-            carga_fisica_h = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.1, step=0.05, key="carga_fisica_h")  # Ajustado
+            precision_pases_h = st.slider("Precisión pases (%)", 0, 100, 81, key="precision_pases_h")
+            delta_h = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.15, step=0.05, key="delta_h")
+            motivacion_h = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.10, step=0.05, key="motivacion_h")
+            carga_fisica_h = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.1, step=0.05, key="carga_fisica_h")
     
     with tab_a:
         col1, col2, col3 = st.columns(3)
@@ -824,18 +838,18 @@ if menu == "🏠 App Principal":
         
         with col2:
             st.subheader("🛡️ Defensa")
-            goles_rec_a = st.number_input("Goles recibidos últ. 10", 0, 30, 11, key="goles_rec_a")  # Ajustado
-            xg_contra_a = st.number_input("xG contra p/p", 0.0, 5.0, 1.3, step=0.1, key="xg_contra_a")  # Ajustado
+            goles_rec_a = st.number_input("Goles recibidos últ. 10", 0, 30, 11, key="goles_rec_a")
+            xg_contra_a = st.number_input("xG contra p/p", 0.0, 5.0, 1.3, step=0.1, key="xg_contra_a")
             entradas_a = st.number_input("Entradas p/p", 0.0, 30.0, 14.5, step=0.1, key="entradas_a")
-            recuperaciones_a = st.number_input("Recuperaciones p/p", 0.0, 100.0, 45.0, step=0.1, key="recuperaciones_a")  # Ajustado
+            recuperaciones_a = st.number_input("Recuperaciones p/p", 0.0, 100.0, 45.0, step=0.1, key="recuperaciones_a")
         
         with col3:
             st.subheader("📈 Control & Estado")
-            posesion_a = st.slider("Posesión (%)", 0, 100, 54, key="posesion_a")  # Ajustado
-            precision_pases_a = st.slider("Precisión pases (%)", 0, 100, 82, key="precision_pases_a")  # Ajustado
-            delta_a = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 0.95, step=0.05, key="delta_a")  # Ajustado
-            motivacion_a = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")  # Ajustado
-            carga_fisica_a = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.3, step=0.05, key="carga_fisica_a")  # Ajustado
+            posesion_a = st.slider("Posesión (%)", 0, 100, 54, key="posesion_a")
+            precision_pases_a = st.slider("Precisión pases (%)", 0, 100, 82, key="precision_pases_a")
+            delta_a = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 0.95, step=0.05, key="delta_a")
+            motivacion_a = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")
+            carga_fisica_a = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.3, step=0.05, key="carga_fisica_a")
     
     st.markdown("---")
     
@@ -855,7 +869,7 @@ if menu == "🏠 App Principal":
             with st.spinner("🧠 EJECUTANDO ANÁLISIS COMPLETO..."):
                 
                 # ============================================
-                # FASE 1: INFERENCIA VARIACIONAL (CON CORRECCIÓN DE FÓRMULA)
+                # FASE 1: INFERENCIA VARIACIONAL
                 # ============================================
                 with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
                     # Obtener inputs de los widgets DIRECTAMENTE DE SESSION_STATE
@@ -896,7 +910,6 @@ if menu == "🏠 App Principal":
                         'entropia_mercado': entropia_mercado
                     }
                     
-                    # Guardar inputs
                     st.session_state['dm']['inputs'] = datos
                     
                     # Preparar datos para inferencia
@@ -931,9 +944,9 @@ if menu == "🏠 App Principal":
                     l_h_adj = post_h["lambda"] * st.session_state['delta_h'] * st.session_state['motivacion_h'] / st.session_state['carga_fisica_h']
                     l_a_adj = post_a["lambda"] * st.session_state['delta_a'] * st.session_state['motivacion_a'] / st.session_state['carga_fisica_a']
                     
-                    # PROTECCIÓN CONTRA LAMBDA MUY BAJO (evitar errores en Poisson) - CORREGIDO a 0.05
-                    l_h_adj = max(l_h_adj, 0.05)  # ← CAMBIADO de 0.1 a 0.05
-                    l_a_adj = max(l_a_adj, 0.05)  # ← CAMBIADO de 0.1 a 0.05
+                    # PROTECCIÓN CONTRA LAMBDA MUY BAJO
+                    l_h_adj = max(l_h_adj, 0.05)
+                    l_a_adj = max(l_a_adj, 0.05)
                     
                     # Guardar resultados Fase 1
                     st.session_state['dm']['fase1'] = {
@@ -1041,7 +1054,8 @@ if menu == "🏠 App Principal":
                         resultados_analisis.append(resultado)
                         
                         # Identificar picks con valor
-                        if value_analysis.get("significativo", False) and ev > 0.02:
+                        # Aquí permitimos EV > 0, pero lo filtraremos visualmente después
+                        if ev > 0.0:
                             picks_con_valor.append(resultado)
                     
                     # Guardar resultados Fase 3
@@ -1248,9 +1262,11 @@ if menu == "🏠 App Principal":
             if not val_entropia: condiciones_evasion.append(f"Entropía alta ({inputs['entropia_mercado']:.3f})")
             
             if condiciones_evasion:
-                st.error(f"🚫 EVASIÓN DE RIESGO: {', '.join(condiciones_evasion)}")
-                st.stop()
-            
+                # CAMBIO CRÍTICO: Usamos warning en vez de stop para no romper el flujo,
+                # pero mantenemos la advertencia visible.
+                st.warning(f"⚠️ **ADVERTENCIA DE RIESGO:** {', '.join(condiciones_evasion)}")
+                # st.stop()  <-- ELIMINADO PARA EVITAR BLOQUEO
+        
             st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
         
         # ============ FASE 1: INFERENCIA BAYESIANA ============
@@ -1358,10 +1374,26 @@ if menu == "🏠 App Principal":
                 
                 # Mostrar cada recomendación - SIEMPRE VISIBLE (sin condiciones)
                 for i, rec in enumerate(recomendaciones):
+                    
+                    # LÓGICA DE FILTRADO VISUAL (OPCIONAL)
+                    # Aquí aplicamos el filtro de cuota mínima DEL SIDEBAR
+                    cumple_cuota = rec['cuota_numerico'] >= min_odd_filter
+                    hay_valor = rec['ev_numerico'] > 0
+                    
+                    # Decidimos si mostramos expandido
+                    mostrar_expandido = hay_valor and cumple_cuota
+                    
+                    # Icono
+                    icon = "✅" if (hay_valor and cumple_cuota) else "⚠️" if (hay_valor and not cumple_cuota) else "⚪"
+
                     with st.expander(
-                        f"🎯 **RECOMENDACIÓN {i+1}: {rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
-                        expanded=True
+                        f"{icon} **RECOMENDACIÓN {i+1}: {rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
+                        expanded=mostrar_expandido
                     ):
+                        
+                        if hay_valor and not cumple_cuota:
+                            st.warning(f"Esta apuesta tiene valor positivo, pero la cuota ({rec['cuota_numerico']:.2f}) es menor a tu límite de {min_odd_filter}.")
+                        
                         # Fila 1: Métricas
                         col_met1, col_met2, col_met3, col_met4 = st.columns(4)
                         
@@ -1387,9 +1419,12 @@ if menu == "🏠 App Principal":
                         
                         col_btn1, col_btn2, col_btn3 = st.columns(3)
                         
+                        # Generamos keys unicas para cada tarjeta
+                        uid_card = str(uuid.uuid4())[:8]
+                        
                         with col_btn1:
-                            if st.button(f"✅ GANADA", key=f"win_{i}_{uuid.uuid4()}", 
-                                      type="primary", use_container_width=True):
+                            if st.button(f"✅ GANADA", key=f"win_{i}_{uid_card}", 
+                                         type="primary", use_container_width=True):
                                 ganancia = rec.get('stake_abs', 0) * (rec.get('cuota_numerico', 2.0) - 1)
                                 resultado = actualizar_bankroll(
                                     resultado_apuesta="ganada",
@@ -1402,8 +1437,8 @@ if menu == "🏠 App Principal":
                                 st.rerun()
                         
                         with col_btn2:
-                            if st.button(f"❌ PERDIDA", key=f"loss_{i}_{uuid.uuid4()}", 
-                                      type="secondary", use_container_width=True):
+                            if st.button(f"❌ PERDIDA", key=f"loss_{i}_{uid_card}", 
+                                         type="secondary", use_container_width=True):
                                 resultado = actualizar_bankroll(
                                     resultado_apuesta="perdida",
                                     monto_apostado=rec.get('stake_abs', 0),
@@ -1414,8 +1449,8 @@ if menu == "🏠 App Principal":
                                 st.rerun()
                         
                         with col_btn3:
-                            if st.button(f"🔄 VOID", key=f"void_{i}_{uuid.uuid4()}", 
-                                      type="secondary", use_container_width=True):
+                            if st.button(f"🔄 VOID", key=f"void_{i}_{uid_card}", 
+                                         type="secondary", use_container_width=True):
                                 resultado = actualizar_bankroll(
                                     resultado_apuesta="void",
                                     monto_apostado=rec.get('stake_abs', 0),
@@ -1552,6 +1587,11 @@ elif menu == "📊 Historial":
         
         # Mostrar tabla de historial
         st.subheader("📋 Historial Detallado")
+        
+        # Ordenar por fecha descendente si existe timestamp
+        if 'timestamp' in df_historial.columns:
+            df_historial = df_historial.sort_values('timestamp', ascending=False)
+            
         st.dataframe(df_historial, use_container_width=True)
         
         # Opción para exportar historial
