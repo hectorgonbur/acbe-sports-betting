@@ -549,6 +549,35 @@ def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, pick=None
         st.session_state.historial_apuestas.append(registro_apuesta)
         return 0
 
+# ============================================
+# FUNCIONES CORREGIDAS PARA EXPORTACIÓN/IMPORTACIÓN
+# ============================================
+
+def limpiar_datos_para_exportar(estado):
+    """Limpia objetos no serializables antes de exportar"""
+    estado_limpio = estado.copy()
+    
+    if 'dm' in estado_limpio:
+        dm = estado_limpio['dm']
+        
+        # Eliminar objetos no serializables de cada fase
+        if 'fase1' in dm:
+            dm['fase1'].pop('modelo', None)  # Eliminar instancia ModeloBayesianoJerarquico
+        
+        if 'fase2' in dm:
+            # Eliminar arrays grandes de simulaciones
+            dm['fase2'].pop('goles_h_sims', None)
+            dm['fase2'].pop('goles_a_sims', None)
+        
+        if 'fase3' in dm:
+            dm['fase3'].pop('detector', None)  # Eliminar instancia DetectorIneficiencias
+        
+        if 'fase4' in dm:
+            dm['fase4'].pop('gestor_riesgo', None)  # Eliminar instancia GestorRiscoCVaR
+            dm['fase4'].pop('backtester', None)     # Eliminar instancia BacktestSintetico
+    
+    return estado_limpio
+
 def exportar_estado_json():
     """Exporta el estado actual a JSON"""
     estado = {
@@ -558,25 +587,63 @@ def exportar_estado_json():
         'historial_apuestas': st.session_state.historial_apuestas,
         'historial_bankroll': st.session_state.historial_bankroll,
         'dm': st.session_state.dm,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'version': '3.0'
     }
     
-    # Convertir a tipos nativos de Python
-    estado = convertir_datos_python(estado)
+    # Limpiar objetos no serializables
+    estado_limpio = limpiar_datos_para_exportar(estado)
     
-    return json.dumps(estado, indent=2, ensure_ascii=False, default=str)
+    # Convertir a tipos nativos de Python
+    estado_limpio = convertir_datos_python(estado_limpio)
+    
+    # Verificar que sea serializable
+    try:
+        json.dumps(estado_limpio, default=str)
+        return json.dumps(estado_limpio, indent=2, ensure_ascii=False, default=str)
+    except Exception as e:
+        st.error(f"Error al serializar: {str(e)}")
+        # Exportar versión mínima sin 'dm'
+        estado_minimo = {
+            'bankroll_actual': st.session_state.bankroll_actual,
+            'bankroll_inicial_sesion': st.session_state.bankroll_inicial_sesion,
+            'beneficio_neto': st.session_state.beneficio_neto,
+            'historial_apuestas': st.session_state.historial_apuestas,
+            'historial_bankroll': st.session_state.historial_bankroll,
+            'timestamp': datetime.now().isoformat(),
+            'version': '3.0',
+            'nota': 'dm no incluido por error de serialización'
+        }
+        return json.dumps(estado_minimo, indent=2, ensure_ascii=False, default=str)
 
 def importar_estado_json(json_data):
     """Importa el estado desde JSON"""
     try:
         estado = json.loads(json_data)
         
+        # Verificar versión
+        version = estado.get('version', '1.0')
+        
+        # Cargar datos básicos
         st.session_state.bankroll_actual = float(estado.get('bankroll_actual', 1000.0))
         st.session_state.bankroll_inicial_sesion = float(estado.get('bankroll_inicial_sesion', 1000.0))
         st.session_state.beneficio_neto = float(estado.get('beneficio_neto', 0.0))
         st.session_state.historial_apuestas = estado.get('historial_apuestas', [])
         st.session_state.historial_bankroll = estado.get('historial_bankroll', [])
-        st.session_state.dm = estado.get('dm', {})
+        
+        # Solo cargar 'dm' si existe y tiene datos válidos
+        if 'dm' in estado and estado['dm']:
+            st.session_state.dm = estado['dm']
+            # Marcar que no podemos re-ejecutar análisis (por falta de objetos)
+            if 'inputs' in st.session_state.dm:
+                st.session_state.dm['importado'] = True
+                st.session_state.dm['reejecutable'] = False
+        else:
+            st.session_state.dm = {}
+            st.session_state.dm['importado'] = True
+        
+        # Resetear flag de análisis ejecutado
+        st.session_state.analisis_ejecutado = True
         
         return True
     except Exception as e:
@@ -713,6 +780,7 @@ if menu == "🏠 App Principal":
                 json_data = uploaded_file.getvalue().decode("utf-8")
                 if importar_estado_json(json_data):
                     st.sidebar.success("✅ Estado importado correctamente")
+                    st.sidebar.warning("⚠️ Nota: Los objetos de análisis no se pueden re-ejecutar")
                     st.rerun()
             except Exception as e:
                 st.sidebar.error(f"❌ Error al importar: {str(e)}")
@@ -935,9 +1003,9 @@ if menu == "🏠 App Principal":
                     l_h_adj = max(l_h_adj, 0.05)  # ← CAMBIADO de 0.1 a 0.05
                     l_a_adj = max(l_a_adj, 0.05)  # ← CAMBIADO de 0.1 a 0.05
                     
-                    # Guardar resultados Fase 1
+                    # Guardar resultados Fase 1 (SOLO DATOS, no objetos)
                     st.session_state['dm']['fase1'] = {
-                        'modelo': modelo_bayes,
+                        #'modelo': modelo_bayes,  # ❌ NO SERIALIZABLE - ELIMINADO
                         'post_h': post_h,
                         'post_a': post_a,
                         'l_h_adj': l_h_adj,
@@ -970,14 +1038,14 @@ if menu == "🏠 App Principal":
                     se_px = float(np.sqrt(px_mc*(1-px_mc)/n_sim))
                     se_p2 = float(np.sqrt(p2_mc*(1-p2_mc)/n_sim))
                     
-                    # Guardar resultados Fase 2
+                    # Guardar resultados Fase 2 (SOLO DATOS, no arrays grandes)
                     st.session_state['dm']['fase2'] = {
                         'p1': p1_mc,
                         'px': px_mc,
                         'p2': p2_mc,
                         'se': [se_p1, se_px, se_p2],
-                        'goles_h_sims': goles_h,
-                        'goles_a_sims': goles_a,
+                        #'goles_h_sims': goles_h,  # ❌ ARRAY GRANDE - ELIMINADO
+                        #'goles_a_sims': goles_a,  # ❌ ARRAY GRANDE - ELIMINADO
                         'n_sim': n_sim
                     }
                 
@@ -1044,9 +1112,9 @@ if menu == "🏠 App Principal":
                         if value_analysis.get("significativo", False) and ev > 0.02:
                             picks_con_valor.append(resultado)
                     
-                    # Guardar resultados Fase 3
+                    # Guardar resultados Fase 3 (SOLO DATOS, no objetos)
                     st.session_state['dm']['fase3'] = {
-                        'detector': detector,
+                        #'detector': detector,  # ❌ NO SERIALIZABLE - ELIMINADO
                         'resultados_analisis': resultados_analisis,
                         'picks_con_valor': picks_con_valor,
                         'entropia_auto': entropia_auto
@@ -1144,10 +1212,10 @@ if menu == "🏠 App Principal":
                             st.warning(f"⚠️ Error procesando pick {r.get('Resultado', 'N/A')}: {str(e)}")
                             continue
                     
-                    # Guardar resultados Fase 4
+                    # Guardar resultados Fase 4 (SOLO DATOS, no objetos)
                     st.session_state['dm']['fase4'] = {
-                        'gestor_riesgo': gestor_riesgo,
-                        'backtester': backtester,
+                        #'gestor_riesgo': gestor_riesgo,  # ❌ NO SERIALIZABLE - ELIMINADO
+                        #'backtester': backtester,        # ❌ NO SERIALIZABLE - ELIMINADO
                         'recomendaciones': recomendaciones,
                         'bankroll': bankroll
                     }
