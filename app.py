@@ -553,7 +553,40 @@ def actualizar_bankroll(resultado_apuesta, monto_apostado, cuota=None, pick=None
         return 0
 
 def exportar_estado_json():
-    """Exporta el estado actual a JSON"""
+    """Exporta el estado actual a JSON incluyendo el estado de los widgets"""
+    # Capturar el estado de los widgets críticos
+    widget_state = {}
+    
+    # Lista de keys críticas a capturar
+    widget_keys = [
+        # Equipos y cuotas
+        'team_h_input', 'team_a_input',
+        'c1_input_pro', 'cx_input_pro', 'c2_input_pro',
+        
+        # Métricas de equipo local
+        'g_h_ult5', 'g_h_ult10', 'xg_h_prom', 'tiros_arco_h',
+        'goles_rec_h', 'xg_contra_h', 'entradas_h', 'recuperaciones_h',
+        'posesion_h', 'precision_pases_h', 'delta_h', 'motivacion_h', 'carga_fisica_h',
+        
+        # Métricas de equipo visitante
+        'g_a_ult5', 'g_a_ult10', 'xg_a_prom', 'tiros_arco_a',
+        'goles_rec_a', 'xg_contra_a', 'entradas_a', 'recuperaciones_a',
+        'posesion_a', 'precision_pases_a', 'delta_a', 'motivacion_a', 'carga_fisica_a',
+        
+        # Sliders del sidebar
+        'ent_slider_v3', 'vol_slider_v3', 'steam_slider_v3',
+        'liga_selector_sidebar',
+        
+        # Objetivos de performance
+        'roi_target_main', 'cvar_target_main', 'max_dd_main', 'sharpe_min_main', 'filter_odd'
+    ]
+    
+    # Capturar valores actuales de los widgets
+    for key in widget_keys:
+        if key in st.session_state:
+            widget_state[key] = st.session_state[key]
+    
+    # Estado general de la aplicación
     estado = {
         'bankroll_actual': st.session_state.bankroll_actual,
         'bankroll_inicial_sesion': st.session_state.bankroll_inicial_sesion,
@@ -561,6 +594,8 @@ def exportar_estado_json():
         'historial_apuestas': st.session_state.historial_apuestas,
         'historial_bankroll': st.session_state.historial_bankroll,
         'dm': st.session_state.dm,
+        'entropia_mercado': st.session_state['entropia_mercado'],
+        'widget_state': widget_state,
         'timestamp': datetime.now().isoformat()
     }
     
@@ -570,16 +605,26 @@ def exportar_estado_json():
     return json.dumps(estado, indent=2, ensure_ascii=False, default=str)
 
 def importar_estado_json(json_data):
-    """Importa el estado desde JSON"""
+    """Importa el estado desde JSON y restaura los widgets"""
     try:
         estado = json.loads(json_data)
         
+        # Primero restaurar el estado de los widgets si existe
+        if 'widget_state' in estado:
+            for key, value in estado['widget_state'].items():
+                st.session_state[key] = value
+        
+        # Restaurar el estado general de la aplicación
         st.session_state.bankroll_actual = float(estado.get('bankroll_actual', 1000.0))
         st.session_state.bankroll_inicial_sesion = float(estado.get('bankroll_inicial_sesion', 1000.0))
         st.session_state.beneficio_neto = float(estado.get('beneficio_neto', 0.0))
         st.session_state.historial_apuestas = estado.get('historial_apuestas', [])
         st.session_state.historial_bankroll = estado.get('historial_bankroll', [])
         st.session_state.dm = estado.get('dm', {})
+        
+        # Restaurar entropía de mercado
+        if 'entropia_mercado' in estado:
+            st.session_state['entropia_mercado'] = estado['entropia_mercado']
         
         return True
     except Exception as e:
