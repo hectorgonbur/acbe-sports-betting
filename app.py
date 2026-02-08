@@ -795,9 +795,9 @@ if menu == "🏠 App Principal":
             st.subheader("📈 Control & Estado")
             posesion_h = st.slider("Posesión (%)", 0, 100, 52, key="posesion_h")
             precision_pases_h = st.slider("Precisión pases (%)", 0, 100, 78, key="precision_pases_h")
-            delta_h = st.slider("Delta forma (1=mejor)", 0.5, 1.5, 1.0, step=0.05, key="delta_h")
-            motivacion_h = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05, key="motivacion_h")
-            carga_fisica_h = st.slider("Carga física (1=normal)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_h")
+            delta_h = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.0, step=0.05, key="delta_h")
+            motivacion_h = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_h")
+            carga_fisica_h = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_h")
     
     with tab_a:
         col1, col2, col3 = st.columns(3)
@@ -820,9 +820,9 @@ if menu == "🏠 App Principal":
             st.subheader("📈 Control & Estado")
             posesion_a = st.slider("Posesión (%)", 0, 100, 48, key="posesion_a")
             precision_pases_a = st.slider("Precisión pases (%)", 0, 100, 76, key="precision_pases_a")
-            delta_a = st.slider("Delta forma (1=mejor)", 0.5, 1.5, 1.0, step=0.05, key="delta_a")
-            motivacion_a = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")
-            carga_fisica_a = st.slider("Carga física (1=normal)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_a")
+            delta_a = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.0, step=0.05, key="delta_a")
+            motivacion_a = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")
+            carga_fisica_a = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_a")
     
     st.markdown("---")
     
@@ -843,7 +843,7 @@ if menu == "🏠 App Principal":
             with st.spinner("🧠 EJECUTANDO ANÁLISIS COMPLETO..."):
                 
                 # ============================================
-                # FASE 1: INFERENCIA VARIACIONAL
+                # FASE 1: INFERENCIA VARIACIONAL (CON CORRECCIÓN DE FÓRMULA)
                 # ============================================
                 with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
                     # Obtener inputs de los widgets DIRECTAMENTE DE SESSION_STATE
@@ -915,9 +915,19 @@ if menu == "🏠 App Principal":
                     post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
                     post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
                     
-                    # Aplicar ajustes de factores de riesgo
-                    l_h_adj = post_h["lambda"] * (1 - st.session_state['delta_h']) * st.session_state['motivacion_h'] / st.session_state['carga_fisica_h']
-                    l_a_adj = post_a["lambda"] * (1 - st.session_state['delta_a']) * st.session_state['motivacion_a'] / st.session_state['carga_fisica_a']
+                    # ============================================
+                    # CORRECCIÓN CRÍTICA: FÓRMULA DE AJUSTE DE FACTORES
+                    # ============================================
+                    # INCORRECTO: post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
+                    # CORRECTO: post_h["lambda"] * delta_h * motivacion_h / carga_fisica_h
+                    # (delta_h es un multiplicador: 1.0 = normal, 1.2 = buena forma)
+                    
+                    l_h_adj = post_h["lambda"] * st.session_state['delta_h'] * st.session_state['motivacion_h'] / st.session_state['carga_fisica_h']
+                    l_a_adj = post_a["lambda"] * st.session_state['delta_a'] * st.session_state['motivacion_a'] / st.session_state['carga_fisica_a']
+                    
+                    # PROTECCIÓN CONTRA LAMBDA MUY BAJO (evitar errores en Poisson)
+                    l_h_adj = max(l_h_adj, 0.1)
+                    l_a_adj = max(l_a_adj, 0.1)
                     
                     # Guardar resultados Fase 1
                     st.session_state['dm']['fase1'] = {
@@ -1248,20 +1258,28 @@ if menu == "🏠 App Principal":
             f1 = dm['fase1']
             inputs = dm['inputs']
             
-            st.subheader("🧠 FASE 1: INFERENCIA BAYESIANA")
+            st.subheader("🧠 FASE 1: INFERENCIA BAYESIANA (CORREGIDA)")
+            
+            # Nota sobre la corrección
+            st.info("**CORRECCIÓN APLICADA:** `lambda * delta_h * motivacion_h / carga_fisica_h` (delta_h es multiplicador)")
+            
             col_inf1, col_inf2 = st.columns(2)
             
             with col_inf1:
                 st.markdown(f"**🏠 {inputs['team_h']}**")
-                st.metric("λ Posterior", f"{f1['l_h_adj']:.3f}", help="Goles esperados ajustados")
+                st.metric("λ Posterior", f"{f1['l_h_adj']:.3f}", 
+                         help="Goles esperados ajustados con factores de forma")
                 st.metric("Incertidumbre", f"{f1['inc_h']:.3%}")
                 st.caption(f"Intervalo Credibilidad: {f1['ci_h'][0]:.2f} - {f1['ci_h'][1]:.2f}")
+                st.caption(f"Factor Forma: ×{st.session_state['delta_h']:.2f}")
             
             with col_inf2:
                 st.markdown(f"**✈️ {inputs['team_a']}**")
-                st.metric("λ Posterior", f"{f1['l_a_adj']:.3f}", help="Goles esperados ajustados")
+                st.metric("λ Posterior", f"{f1['l_a_adj']:.3f}", 
+                         help="Goles esperados ajustados con factores de forma")
                 st.metric("Incertidumbre", f"{f1['inc_a']:.3%}")
                 st.caption(f"Intervalo Credibilidad: {f1['ci_a'][0]:.2f} - {f1['ci_a'][1]:.2f}")
+                st.caption(f"Factor Forma: ×{st.session_state['delta_a']:.2f}")
         
         # ============ FASE 2: SIMULACIÓN MONTE CARLO ============
         if 'fase2' in dm:
