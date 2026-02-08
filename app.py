@@ -53,7 +53,7 @@ if 'historial_apuestas' not in st.session_state:
     st.session_state.historial_apuestas = []
 
 # ============================================
-# CLASES DEL NÚCLEO MATEMÁTICO (GLOBALES)
+# CLASES DEL NÚCLEO MATEMÁTICO (GLOBALES) - CORREGIDAS
 # ============================================
 
 class SistemaLogging:
@@ -219,11 +219,12 @@ class GestorRiscoCVaR:
             cvar_actual = float(metrics.get("cvar_estimado", 0.15))
             cvar_actual = min(1.0, max(0.0, cvar_actual))
             
-            if cvar_actual >= 1.0:
+            # CORRECCIÓN CRÍTICA: Cambiar umbral de 1.0 (100%) a 0.8 (80%)
+            if cvar_actual >= 0.8:  # ← 80% en lugar de 100%
                 return {
                     "stake_pct": 0.0, 
                     "stake_abs": 0.0, 
-                    "razon": "🚫 EVASIÓN: Riesgo de cola inaceptable (100%+)"
+                    "razon": f"🚫 EVASIÓN: Riesgo de cola inaceptable ({cvar_actual:.0%})"
                 }
             
             incertidumbre = float(metrics.get("incertidumbre", 0.5))
@@ -296,6 +297,18 @@ class GestorRiscoCVaR:
     
     def simular_cvar(self, prob, cuota, n_simulaciones=10000, conf_level=0.95):
         try:
+            # CORRECCIÓN CRÍTICA: Si probabilidad > 0.99, CVaR = 0.0
+            if prob > 0.99:
+                return {
+                    "cvar": 0.0,
+                    "var": 0.0,
+                    "esperanza": cuota - 1,
+                    "desviacion": 0.001,
+                    "sharpe_simulado": (cuota - 1) / 0.001,
+                    "max_perdida_simulada": -1,
+                    "prob_perdida": 1 - prob
+                }
+            
             if prob <= 0 or prob >= 1 or cuota <= 1:
                 return {
                     "cvar": 0.25,
@@ -730,9 +743,9 @@ if menu == "🏠 App Principal":
     
     st.sidebar.header("💰 MERCADO")
     c_col1, c_col2, c_col3 = st.sidebar.columns(3)
-    c1 = c_col1.number_input("1", value=2.90, min_value=1.01, step=0.01, key="c1_input_pro")
-    cx = c_col2.number_input("X", value=3.25, min_value=1.01, step=0.01, key="cx_input_pro")
-    c2 = c_col3.number_input("2", value=2.45, min_value=1.01, step=0.01, key="c2_input_pro")
+    c1 = c_col1.number_input("1", value=2.45, min_value=1.01, step=0.01, key="c1_input_pro")  # Cambiado a 2.45
+    cx = c_col2.number_input("X", value=3.30, min_value=1.01, step=0.01, key="cx_input_pro")  # Cambiado a 3.30
+    c2 = c_col3.number_input("2", value=2.90, min_value=1.01, step=0.01, key="c2_input_pro")  # Cambiado a 2.90
     
     st.sidebar.markdown("---")
     st.sidebar.header("📈 MÉTRICAS DE MERCADO")
@@ -748,7 +761,7 @@ if menu == "🏠 App Principal":
     )
     st.session_state['entropia_mercado'] = entropia_mercado
     
-    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.0, step=0.1, key="vol_slider_v3")
+    volumen_estimado = st.sidebar.slider("Volumen Relativo", 0.5, 2.0, 1.2, step=0.1, key="vol_slider_v3")
     steam_detectado = st.sidebar.slider("Steam Move (σ)", 0.0, 0.05, 0.0, step=0.005, key="steam_slider_v3")
     
     col_met1, col_met2, col_met3 = st.sidebar.columns(3)
@@ -781,23 +794,23 @@ if menu == "🏠 App Principal":
             st.subheader("⚽ Ataque")
             g_h_ult5 = st.number_input("Goles últimos 5 partidos", 0, 30, 8, key="g_h_ult5")
             g_h_ult10 = st.number_input("Goles últimos 10 partidos", 0, 60, 15, key="g_h_ult10")
-            xg_h_prom = st.number_input("xG promedio", 0.0, 5.0, 1.5, step=0.1, key="xg_h_prom")
+            xg_h_prom = st.number_input("xG promedio", 0.0, 5.0, 1.6, step=0.1, key="xg_h_prom")  # Ajustado
             tiros_arco_h = st.number_input("Tiros a puerta p/p", 0.0, 20.0, 4.5, step=0.1, key="tiros_arco_h")
         
         with col2:
             st.subheader("🛡️ Defensa")
-            goles_rec_h = st.number_input("Goles recibidos últ. 10", 0, 30, 12, key="goles_rec_h")
-            xg_contra_h = st.number_input("xG contra p/p", 0.0, 5.0, 1.2, step=0.1, key="xg_contra_h")
-            entradas_h = st.number_input("Entradas p/p", 0.0, 30.0, 15.5, step=0.1, key="entradas_h")
-            recuperaciones_h = st.number_input("Recuperaciones p/p", 0.0, 100.0, 45.0, step=0.1, key="recuperaciones_h")
+            goles_rec_h = st.number_input("Goles recibidos últ. 10", 0, 30, 8, key="goles_rec_h")  # Ajustado
+            xg_contra_h = st.number_input("xG contra p/p", 0.0, 5.0, 1.1, step=0.1, key="xg_contra_h")  # Ajustado
+            entradas_h = st.number_input("Entradas p/p", 0.0, 30.0, 16.0, step=0.1, key="entradas_h")  # Ajustado
+            recuperaciones_h = st.number_input("Recuperaciones p/p", 0.0, 100.0, 48.0, step=0.1, key="recuperaciones_h")  # Ajustado
         
         with col3:
             st.subheader("📈 Control & Estado")
             posesion_h = st.slider("Posesión (%)", 0, 100, 52, key="posesion_h")
-            precision_pases_h = st.slider("Precisión pases (%)", 0, 100, 78, key="precision_pases_h")
-            delta_h = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.0, step=0.05, key="delta_h")
-            motivacion_h = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_h")
-            carga_fisica_h = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_h")
+            precision_pases_h = st.slider("Precisión pases (%)", 0, 100, 81, key="precision_pases_h")  # Ajustado
+            delta_h = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.15, step=0.05, key="delta_h")  # Ajustado
+            motivacion_h = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.10, step=0.05, key="motivacion_h")  # Ajustado
+            carga_fisica_h = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.1, step=0.05, key="carga_fisica_h")  # Ajustado
     
     with tab_a:
         col1, col2, col3 = st.columns(3)
@@ -807,22 +820,22 @@ if menu == "🏠 App Principal":
             g_a_ult5 = st.number_input("Goles últimos 5 partidos", 0, 30, 7, key="g_a_ult5")
             g_a_ult10 = st.number_input("Goles últimos 10 partidos", 0, 60, 14, key="g_a_ult10")
             xg_a_prom = st.number_input("xG promedio", 0.0, 5.0, 1.4, step=0.1, key="xg_a_prom")
-            tiros_arco_a = st.number_input("Tiros a puerta p/p", 0.0, 20.0, 4.2, step=0.1, key="tiros_arco_a")
+            tiros_arco_a = st.number_input("Tiros a puerta p/p", 0.0, 20.0, 4.3, step=0.1, key="tiros_arco_a")
         
         with col2:
             st.subheader("🛡️ Defensa")
-            goles_rec_a = st.number_input("Goles recibidos últ. 10", 0, 30, 10, key="goles_rec_a")
-            xg_contra_a = st.number_input("xG contra p/p", 0.0, 5.0, 1.1, step=0.1, key="xg_contra_a")
+            goles_rec_a = st.number_input("Goles recibidos últ. 10", 0, 30, 11, key="goles_rec_a")  # Ajustado
+            xg_contra_a = st.number_input("xG contra p/p", 0.0, 5.0, 1.3, step=0.1, key="xg_contra_a")  # Ajustado
             entradas_a = st.number_input("Entradas p/p", 0.0, 30.0, 14.5, step=0.1, key="entradas_a")
-            recuperaciones_a = st.number_input("Recuperaciones p/p", 0.0, 100.0, 42.0, step=0.1, key="recuperaciones_a")
+            recuperaciones_a = st.number_input("Recuperaciones p/p", 0.0, 100.0, 45.0, step=0.1, key="recuperaciones_a")  # Ajustado
         
         with col3:
             st.subheader("📈 Control & Estado")
-            posesion_a = st.slider("Posesión (%)", 0, 100, 48, key="posesion_a")
-            precision_pases_a = st.slider("Precisión pases (%)", 0, 100, 76, key="precision_pases_a")
-            delta_a = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 1.0, step=0.05, key="delta_a")
-            motivacion_a = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")
-            carga_fisica_a = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_a")
+            posesion_a = st.slider("Posesión (%)", 0, 100, 54, key="posesion_a")  # Ajustado
+            precision_pases_a = st.slider("Precisión pases (%)", 0, 100, 82, key="precision_pases_a")  # Ajustado
+            delta_a = st.slider("Delta forma (1=normal, 1.2=buena)", 0.5, 1.5, 0.95, step=0.05, key="delta_a")  # Ajustado
+            motivacion_a = st.slider("Motivación (1=normal, 1.2=alta)", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")  # Ajustado
+            carga_fisica_a = st.slider("Carga física (1=normal, 2.0=alta)", 0.5, 2.0, 1.3, step=0.05, key="carga_fisica_a")  # Ajustado
     
     st.markdown("---")
     
@@ -830,7 +843,6 @@ if menu == "🏠 App Principal":
     # BOTÓN ÚNICO DE EJECUCIÓN (LA COCINA)
     # ============================================
     
-    # Botón en la app principal (no en sidebar) para asegurar scope
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
         ejecutar_analisis = st.button("🚀 EJECUTAR ANÁLISIS COMPLETO", 
@@ -848,8 +860,8 @@ if menu == "🏠 App Principal":
                 with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
                     # Obtener inputs de los widgets DIRECTAMENTE DE SESSION_STATE
                     datos = {
-                        'team_h': st.session_state['team_h_input'],
-                        'team_a': st.session_state['team_a_input'],
+                        'team_h': team_h,
+                        'team_a': team_a,
                         'g_h_ult5': st.session_state['g_h_ult5'],
                         'g_h_ult10': st.session_state['g_h_ult10'],
                         'xg_h_prom': st.session_state['xg_h_prom'],
@@ -876,14 +888,12 @@ if menu == "🏠 App Principal":
                         'delta_a': st.session_state['delta_a'],
                         'motivacion_a': st.session_state['motivacion_a'],
                         'carga_fisica_a': st.session_state['carga_fisica_a'],
-                        'cuotas': {'1': st.session_state['c1_input_pro'], 
-                                  'X': st.session_state['cx_input_pro'], 
-                                  '2': st.session_state['c2_input_pro']},
+                        'cuotas': {'1': c1, 'X': cx, '2': c2},
                         'overround': or_val, 
                         'liga': liga,
-                        'volumen_estimado': st.session_state['vol_slider_v3'],
-                        'steam_detectado': st.session_state['steam_slider_v3'],
-                        'entropia_mercado': st.session_state['ent_slider_v3']
+                        'volumen_estimado': volumen_estimado,
+                        'steam_detectado': steam_detectado,
+                        'entropia_mercado': entropia_mercado
                     }
                     
                     # Guardar inputs
@@ -918,16 +928,12 @@ if menu == "🏠 App Principal":
                     # ============================================
                     # CORRECCIÓN CRÍTICA: FÓRMULA DE AJUSTE DE FACTORES
                     # ============================================
-                    # INCORRECTO: post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
-                    # CORRECTO: post_h["lambda"] * delta_h * motivacion_h / carga_fisica_h
-                    # (delta_h es un multiplicador: 1.0 = normal, 1.2 = buena forma)
-                    
                     l_h_adj = post_h["lambda"] * st.session_state['delta_h'] * st.session_state['motivacion_h'] / st.session_state['carga_fisica_h']
                     l_a_adj = post_a["lambda"] * st.session_state['delta_a'] * st.session_state['motivacion_a'] / st.session_state['carga_fisica_a']
                     
-                    # PROTECCIÓN CONTRA LAMBDA MUY BAJO (evitar errores en Poisson)
-                    l_h_adj = max(l_h_adj, 0.1)
-                    l_a_adj = max(l_a_adj, 0.1)
+                    # PROTECCIÓN CONTRA LAMBDA MUY BAJO (evitar errores en Poisson) - CORREGIDO a 0.05
+                    l_h_adj = max(l_h_adj, 0.05)  # ← CAMBIADO de 0.1 a 0.05
+                    l_a_adj = max(l_a_adj, 0.05)  # ← CAMBIADO de 0.1 a 0.05
                     
                     # Guardar resultados Fase 1
                     st.session_state['dm']['fase1'] = {
@@ -947,8 +953,6 @@ if menu == "🏠 App Principal":
                 # ============================================
                 with st.spinner("🎲 Fase 2: Simulación Monte Carlo (50k escenarios)..."):
                     n_sim = 50000
-                    post_h = st.session_state['dm']['fase1']['post_h']
-                    post_a = st.session_state['dm']['fase1']['post_a']
                     l_h_adj = st.session_state['dm']['fase1']['l_h_adj']
                     l_a_adj = st.session_state['dm']['fase1']['l_a_adj']
                     
@@ -985,13 +989,9 @@ if menu == "🏠 App Principal":
                     detector = DetectorIneficiencias()
                     
                     # Probabilidades del mercado
-                    c1_val = st.session_state['c1_input_pro']
-                    cx_val = st.session_state['cx_input_pro']
-                    c2_val = st.session_state['c2_input_pro']
-                    
-                    p1_mercado = 1 / c1_val if c1_val > 0 else 0.33
-                    px_mercado = 1 / cx_val if cx_val > 0 else 0.33
-                    p2_mercado = 1 / c2_val if c2_val > 0 else 0.33
+                    p1_mercado = 1 / c1 if c1 > 0 else 0.33
+                    px_mercado = 1 / cx if cx > 0 else 0.33
+                    p2_mercado = 1 / c2 if c2 > 0 else 0.33
                     
                     # Entropía de Shannon
                     prob_mercado_array = np.array([p1_mercado, px_mercado, p2_mercado])
@@ -1007,7 +1007,7 @@ if menu == "🏠 App Principal":
                         [p1_mc, px_mc, p2_mc],
                         [p1_mercado, px_mercado, p2_mercado],
                         [se_p1, se_px, se_p2],
-                        [c1_val, cx_val, c2_val]
+                        [c1, cx, c2]
                     ):
                         # Value Score
                         value_analysis = detector.calcular_value_score(p_modelo, p_mercado, se)
