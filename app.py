@@ -20,6 +20,45 @@ import uuid
 st.set_page_config(page_title="Sistema ACBE-Kelly", layout="wide")
 
 # ============================================
+# INICIALIZACIÓN DE VARIABLES DE INPUTS (CORRECCIÓN DE SCOPE)
+# ============================================
+# Inicializar todas las variables de inputs con valores por defecto
+# Esto soluciona el error de scope: las variables existen en el namespace global
+g_h_ult5 = 0
+g_h_ult10 = 0
+xg_h_prom = 0.0
+tiros_arco_h = 0
+posesion_h = 50.0
+precision_pases_h = 75.0
+goles_rec_h = 0
+xg_contra_h = 0.0
+entradas_h = 0
+recuperaciones_h = 0
+delta_h = 0.0
+motivacion_h = 1.0
+carga_fisica_h = 1.0
+
+g_a_ult5 = 0
+g_a_ult10 = 0
+xg_a_prom = 0.0
+tiros_arco_a = 0
+posesion_a = 50.0
+precision_pases_a = 75.0
+goles_rec_a = 0
+xg_contra_a = 0.0
+entradas_a = 0
+recuperaciones_a = 0
+delta_a = 0.0
+motivacion_a = 1.0
+carga_fisica_a = 1.0
+
+# Variables de mercado
+c1 = 2.90
+cx = 3.25
+c2 = 2.45
+or_val = 0.0
+
+# ============================================
 # INICIALIZACIÓN DEL ESTADO DE LA SESIÓN
 # ============================================
 
@@ -729,13 +768,77 @@ if menu == "🏠 App Principal":
                                key="liga_selector_sidebar")
     
     # ============================================
+    # SECCIÓN DE INPUTS DE EQUIPOS (EN APP PRINCIPAL)
+    # ============================================
+    
+    st.header("📊 DATOS DE LOS EQUIPOS")
+    
+    # Crear tabs para separar equipo local y visitante
+    tab_h, tab_a = st.tabs([f"🏠 {team_h} (Local)", f"✈️ {team_a} (Visitante)"])
+    
+    with tab_h:
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.subheader("⚽ Ataque")
+            g_h_ult5 = st.number_input("Goles últimos 5 partidos", 0, 30, 8, key="g_h_ult5")
+            g_h_ult10 = st.number_input("Goles últimos 10 partidos", 0, 60, 15, key="g_h_ult10")
+            xg_h_prom = st.number_input("xG promedio", 0.0, 5.0, 1.5, step=0.1, key="xg_h_prom")
+            tiros_arco_h = st.number_input("Tiros a puerta p/p", 0.0, 20.0, 4.5, step=0.1, key="tiros_arco_h")
+        
+        with col2:
+            st.subheader("🛡️ Defensa")
+            goles_rec_h = st.number_input("Goles recibidos últ. 10", 0, 30, 12, key="goles_rec_h")
+            xg_contra_h = st.number_input("xG contra p/p", 0.0, 5.0, 1.2, step=0.1, key="xg_contra_h")
+            entradas_h = st.number_input("Entradas p/p", 0.0, 30.0, 15.5, step=0.1, key="entradas_h")
+            recuperaciones_h = st.number_input("Recuperaciones p/p", 0.0, 100.0, 45.0, step=0.1, key="recuperaciones_h")
+        
+        with col3:
+            st.subheader("📈 Control & Estado")
+            posesion_h = st.slider("Posesión (%)", 0, 100, 52, key="posesion_h")
+            precision_pases_h = st.slider("Precisión pases (%)", 0, 100, 78, key="precision_pases_h")
+            delta_h = st.slider("Delta forma (1=mejor)", 0.5, 1.5, 1.0, step=0.05, key="delta_h")
+            motivacion_h = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05, key="motivacion_h")
+            carga_fisica_h = st.slider("Carga física (1=normal)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_h")
+    
+    with tab_a:
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.subheader("⚽ Ataque")
+            g_a_ult5 = st.number_input("Goles últimos 5 partidos", 0, 30, 7, key="g_a_ult5")
+            g_a_ult10 = st.number_input("Goles últimos 10 partidos", 0, 60, 14, key="g_a_ult10")
+            xg_a_prom = st.number_input("xG promedio", 0.0, 5.0, 1.4, step=0.1, key="xg_a_prom")
+            tiros_arco_a = st.number_input("Tiros a puerta p/p", 0.0, 20.0, 4.2, step=0.1, key="tiros_arco_a")
+        
+        with col2:
+            st.subheader("🛡️ Defensa")
+            goles_rec_a = st.number_input("Goles recibidos últ. 10", 0, 30, 10, key="goles_rec_a")
+            xg_contra_a = st.number_input("xG contra p/p", 0.0, 5.0, 1.1, step=0.1, key="xg_contra_a")
+            entradas_a = st.number_input("Entradas p/p", 0.0, 30.0, 14.5, step=0.1, key="entradas_a")
+            recuperaciones_a = st.number_input("Recuperaciones p/p", 0.0, 100.0, 42.0, step=0.1, key="recuperaciones_a")
+        
+        with col3:
+            st.subheader("📈 Control & Estado")
+            posesion_a = st.slider("Posesión (%)", 0, 100, 48, key="posesion_a")
+            precision_pases_a = st.slider("Precisión pases (%)", 0, 100, 76, key="precision_pases_a")
+            delta_a = st.slider("Delta forma (1=mejor)", 0.5, 1.5, 1.0, step=0.05, key="delta_a")
+            motivacion_a = st.slider("Motivación", 0.5, 1.5, 1.0, step=0.05, key="motivacion_a")
+            carga_fisica_a = st.slider("Carga física (1=normal)", 0.5, 2.0, 1.0, step=0.05, key="carga_fisica_a")
+    
+    st.markdown("---")
+    
+    # ============================================
     # BOTÓN ÚNICO DE EJECUCIÓN (LA COCINA)
     # ============================================
     
-    st.sidebar.markdown("---")
-    ejecutar_analisis = st.sidebar.button("🚀 EJECUTAR ANÁLISIS COMPLETO", 
-                                          type="primary", 
-                                          key="btn_final_maestro")
+    # Botón en la app principal (no en sidebar) para asegurar scope
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    with col_btn2:
+        ejecutar_analisis = st.button("🚀 EJECUTAR ANÁLISIS COMPLETO", 
+                                      type="primary", 
+                                      key="btn_final_maestro",
+                                      use_container_width=True)
     
     if ejecutar_analisis:
         try:
@@ -745,7 +848,7 @@ if menu == "🏠 App Principal":
                 # FASE 1: INFERENCIA VARIACIONAL
                 # ============================================
                 with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
-                    # Obtener inputs de los widgets
+                    # Obtener inputs de los widgets (ahora están en scope global)
                     datos = {
                         'team_h': team_h, 'team_a': team_a,
                         'g_h_ult5': g_h_ult5, 'g_h_ult10': g_h_ult10,
