@@ -296,6 +296,18 @@ class GestorRiscoCVaR:
     
     def simular_cvar(self, prob, cuota, n_simulaciones=10000, conf_level=0.95):
         try:
+            # CORRECCIÓN: Si probabilidad > 0.99, CVaR = 0.0
+            if prob > 0.99:
+                return {
+                    "cvar": 0.0,
+                    "var": 0.0,
+                    "esperanza": cuota - 1,
+                    "desviacion": 0.001,
+                    "sharpe_simulado": (cuota - 1) / 0.001,
+                    "max_perdida_simulada": -1,
+                    "prob_perdida": 1 - prob
+                }
+            
             if prob <= 0 or prob >= 1 or cuota <= 1:
                 return {
                     "cvar": 0.25,
@@ -827,10 +839,9 @@ if menu == "🏠 App Principal":
     st.markdown("---")
     
     # ============================================
-    # BOTÓN ÚNICO DE EJECUCIÓN (LA COCINA)
+    # BOTÓN ÚNICO DE EJECUCIÓN (LA COCINA) - CORREGIDO
     # ============================================
     
-    # Botón en la app principal (no en sidebar) para asegurar scope
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
         ejecutar_analisis = st.button("🚀 EJECUTAR ANÁLISIS COMPLETO", 
@@ -843,13 +854,13 @@ if menu == "🏠 App Principal":
             with st.spinner("🧠 EJECUTANDO ANÁLISIS COMPLETO..."):
                 
                 # ============================================
-                # FASE 1: INFERENCIA VARIACIONAL (CON CORRECCIÓN DE FÓRMULA)
+                # FASE 1: INFERENCIA VARIACIONAL (FÓRMULA CORREGIDA)
                 # ============================================
                 with st.spinner("🔮 Fase 1: Inferencia Bayesiana..."):
-                    # Obtener inputs de los widgets DIRECTAMENTE DE SESSION_STATE
+                    # USO DE SHORT KEYS DIRECTAMENTE DE SESSION_STATE
                     datos = {
-                        'team_h': st.session_state['team_h_input'],
-                        'team_a': st.session_state['team_a_input'],
+                        'team_h': team_h,
+                        'team_a': team_a,
                         'g_h_ult5': st.session_state['g_h_ult5'],
                         'g_h_ult10': st.session_state['g_h_ult10'],
                         'xg_h_prom': st.session_state['xg_h_prom'],
@@ -876,17 +887,14 @@ if menu == "🏠 App Principal":
                         'delta_a': st.session_state['delta_a'],
                         'motivacion_a': st.session_state['motivacion_a'],
                         'carga_fisica_a': st.session_state['carga_fisica_a'],
-                        'cuotas': {'1': st.session_state['c1_input_pro'], 
-                                  'X': st.session_state['cx_input_pro'], 
-                                  '2': st.session_state['c2_input_pro']},
+                        'cuotas': {'1': c1, 'X': cx, '2': c2},
                         'overround': or_val, 
                         'liga': liga,
-                        'volumen_estimado': st.session_state['vol_slider_v3'],
-                        'steam_detectado': st.session_state['steam_slider_v3'],
-                        'entropia_mercado': st.session_state['ent_slider_v3']
+                        'volumen_estimado': volumen_estimado,
+                        'steam_detectado': steam_detectado,
+                        'entropia_mercado': entropia_mercado
                     }
                     
-                    # Guardar inputs
                     st.session_state['dm']['inputs'] = datos
                     
                     # Preparar datos para inferencia
@@ -910,26 +918,21 @@ if menu == "🏠 App Principal":
                         "precision_pases": st.session_state['precision_pases_a']
                     }
                     
-                    # Ejecutar inferencia
                     modelo_bayes = ModeloBayesianoJerarquico(liga)
                     post_h = modelo_bayes.inferencia_variacional(datos_local, es_local=True)
                     post_a = modelo_bayes.inferencia_variacional(datos_visitante, es_local=False)
                     
                     # ============================================
-                    # CORRECCIÓN CRÍTICA: FÓRMULA DE AJUSTE DE FACTORES
+                    # CORRECCIÓN CRÍTICA APLICADA: FÓRMULA MULTIPLICATIVA
+                    # delta=1.0 es neutro, 1.2 es buena forma
                     # ============================================
-                    # INCORRECTO: post_h["lambda"] * (1 - delta_h) * motivacion_h / carga_fisica_h
-                    # CORRECTO: post_h["lambda"] * delta_h * motivacion_h / carga_fisica_h
-                    # (delta_h es un multiplicador: 1.0 = normal, 1.2 = buena forma)
-                    
                     l_h_adj = post_h["lambda"] * st.session_state['delta_h'] * st.session_state['motivacion_h'] / st.session_state['carga_fisica_h']
                     l_a_adj = post_a["lambda"] * st.session_state['delta_a'] * st.session_state['motivacion_a'] / st.session_state['carga_fisica_a']
                     
-                    # PROTECCIÓN CONTRA LAMBDA MUY BAJO (evitar errores en Poisson)
-                    l_h_adj = max(l_h_adj, 0.1)
-                    l_a_adj = max(l_a_adj, 0.1)
+                    # PROTECCIÓN CONTRA SINGULARIDAD MATEMÁTICA (0.05 en lugar de 0.1)
+                    l_h_adj = max(l_h_adj, 0.05)
+                    l_a_adj = max(l_a_adj, 0.05)
                     
-                    # Guardar resultados Fase 1
                     st.session_state['dm']['fase1'] = {
                         'modelo': modelo_bayes,
                         'post_h': post_h,
@@ -947,26 +950,21 @@ if menu == "🏠 App Principal":
                 # ============================================
                 with st.spinner("🎲 Fase 2: Simulación Monte Carlo (50k escenarios)..."):
                     n_sim = 50000
-                    post_h = st.session_state['dm']['fase1']['post_h']
-                    post_a = st.session_state['dm']['fase1']['post_a']
                     l_h_adj = st.session_state['dm']['fase1']['l_h_adj']
                     l_a_adj = st.session_state['dm']['fase1']['l_a_adj']
                     
-                    # Simulación vectorizada de goles
+                    # Simulación vectorizada con lambdas corregidas
                     goles_h = np.random.poisson(l_h_adj, n_sim)
                     goles_a = np.random.poisson(l_a_adj, n_sim)
                     
-                    # Probabilidades
                     p1_mc = float(np.mean(goles_h > goles_a))
                     px_mc = float(np.mean(goles_h == goles_a))
                     p2_mc = float(np.mean(goles_h < goles_a))
                     
-                    # Errores estándar
                     se_p1 = float(np.sqrt(p1_mc*(1-p1_mc)/n_sim))
                     se_px = float(np.sqrt(px_mc*(1-px_mc)/n_sim))
                     se_p2 = float(np.sqrt(p2_mc*(1-p2_mc)/n_sim))
                     
-                    # Guardar resultados Fase 2
                     st.session_state['dm']['fase2'] = {
                         'p1': p1_mc,
                         'px': px_mc,
@@ -981,24 +979,16 @@ if menu == "🏠 App Principal":
                 # FASE 3: DETECCIÓN DE INEFICIENCIAS
                 # ============================================
                 with st.spinner("🔍 Fase 3: Detectando ineficiencias..."):
-                    # Inicializar detector
                     detector = DetectorIneficiencias()
                     
-                    # Probabilidades del mercado
-                    c1_val = st.session_state['c1_input_pro']
-                    cx_val = st.session_state['cx_input_pro']
-                    c2_val = st.session_state['c2_input_pro']
+                    p1_mercado = 1 / c1 if c1 > 0 else 0.33
+                    px_mercado = 1 / cx if cx > 0 else 0.33
+                    p2_mercado = 1 / c2 if c2 > 0 else 0.33
                     
-                    p1_mercado = 1 / c1_val if c1_val > 0 else 0.33
-                    px_mercado = 1 / cx_val if cx_val > 0 else 0.33
-                    p2_mercado = 1 / c2_val if c2_val > 0 else 0.33
-                    
-                    # Entropía de Shannon
                     prob_mercado_array = np.array([p1_mercado, px_mercado, p2_mercado])
                     prob_mercado_array = prob_mercado_array[prob_mercado_array > 0]
                     entropia_auto = -np.sum(prob_mercado_array * np.log2(prob_mercado_array))
                     
-                    # Análisis para cada resultado
                     resultados_analisis = []
                     picks_con_valor = []
                     
@@ -1007,18 +997,11 @@ if menu == "🏠 App Principal":
                         [p1_mc, px_mc, p2_mc],
                         [p1_mercado, px_mercado, p2_mercado],
                         [se_p1, se_px, se_p2],
-                        [c1_val, cx_val, c2_val]
+                        [c1, cx, c2]
                     ):
-                        # Value Score
                         value_analysis = detector.calcular_value_score(p_modelo, p_mercado, se)
-                        
-                        # KL Divergence
                         kl_analysis = detector.calcular_entropia_kullback_leibler(p_modelo, p_mercado)
-                        
-                        # Valor esperado
                         ev = p_modelo * cuota - 1
-                        
-                        # Cuota justa
                         fair_odd = 1 / p_modelo if p_modelo > 0 else 999
                         
                         resultado = {
@@ -1040,11 +1023,9 @@ if menu == "🏠 App Principal":
                         
                         resultados_analisis.append(resultado)
                         
-                        # Identificar picks con valor
                         if value_analysis.get("significativo", False) and ev > 0.02:
                             picks_con_valor.append(resultado)
                     
-                    # Guardar resultados Fase 3
                     st.session_state['dm']['fase3'] = {
                         'detector': detector,
                         'resultados_analisis': resultados_analisis,
@@ -1056,7 +1037,6 @@ if menu == "🏠 App Principal":
                 # FASE 4: GESTIÓN DE CAPITAL
                 # ============================================
                 with st.spinner("💰 Fase 4: Gestión de capital (Kelly Dinámico)..."):
-                    # Inicializar componentes
                     gestor_riesgo = GestorRiscoCVaR(cvar_target=cvar_target, max_drawdown=max_dd)
                     backtester = BacktestSintetico()
                     
@@ -1066,18 +1046,15 @@ if menu == "🏠 App Principal":
                     post_a = st.session_state['dm']['fase1']['post_a']
                     entropia_auto = st.session_state['dm']['fase3']['entropia_auto']
                     
-                    # Ejecutar gestión de capital para cada pick con valor
                     recomendaciones = []
                     
                     for r in picks_con_valor:
                         try:
-                            # Datos numéricos
                             prob_modelo_numerico = r["Prob Modelo"]
                             cuota_numerico = r["Cuota Mercado"]
                             ev_numerico = r["EV"]
                             significativo = r["Value Score"]["significativo"]
                             
-                            # Simulación CVaR
                             simulacion_cvar = gestor_riesgo.simular_cvar(
                                 prob=prob_modelo_numerico,
                                 cuota=cuota_numerico,
@@ -1085,7 +1062,6 @@ if menu == "🏠 App Principal":
                                 conf_level=0.95
                             )
                             
-                            # Incertidumbre según resultado
                             if r["Resultado"] == "1":
                                 incertidumbre_valor = post_h.get("incertidumbre", 0.5)
                             elif r["Resultado"] in ["2", "X"]:
@@ -1093,7 +1069,6 @@ if menu == "🏠 App Principal":
                             else:
                                 incertidumbre_valor = 0.5
                             
-                            # Métricas para Kelly
                             metrics_kelly = {
                                 "incertidumbre": incertidumbre_valor,
                                 "cvar_estimado": simulacion_cvar.get("cvar", 0.15),
@@ -1105,7 +1080,6 @@ if menu == "🏠 App Principal":
                                 "significativo": significativo
                             }
                             
-                            # Kelly Dinámico
                             kelly_result = gestor_riesgo.calcular_kelly_dinamico(
                                 prob=prob_modelo_numerico,
                                 cuota=cuota_numerico,
@@ -1113,7 +1087,6 @@ if menu == "🏠 App Principal":
                                 metrics=metrics_kelly
                             )
                             
-                            # Backtest Sintético
                             backtest_result = backtester.generar_escenarios(
                                 prob=prob_modelo_numerico,
                                 cuota=cuota_numerico,
@@ -1144,7 +1117,6 @@ if menu == "🏠 App Principal":
                             st.warning(f"⚠️ Error procesando pick {r.get('Resultado', 'N/A')}: {str(e)}")
                             continue
                     
-                    # Guardar resultados Fase 4
                     st.session_state['dm']['fase4'] = {
                         'gestor_riesgo': gestor_riesgo,
                         'backtester': backtester,
@@ -1158,7 +1130,6 @@ if menu == "🏠 App Principal":
                 with st.spinner("📊 Fase 5: Generando métricas de performance..."):
                     recomendaciones = st.session_state['dm']['fase4']['recomendaciones']
                     
-                    # Calcular métricas agregadas
                     ev_promedio = 0
                     sharpe_promedio = 0
                     cvar_promedio = 0
@@ -1172,7 +1143,6 @@ if menu == "🏠 App Principal":
                         cvar_promedio = np.mean([r.get('cvar', 0.15) for r in recomendaciones])
                         prob_profit_promedio = np.mean([r.get('prob_profit', 0) for r in recomendaciones])
                         
-                        # Verificar objetivos
                         if ev_promedio * 100 >= roi_target * 0.8:
                             objetivos_cumplidos.append("ROI")
                         if cvar_promedio <= cvar_target/100:
@@ -1180,7 +1150,6 @@ if menu == "🏠 App Principal":
                         if sharpe_promedio >= sharpe_min:
                             objetivos_cumplidos.append("Sharpe")
                     
-                    # Guardar resultados Fase 5
                     st.session_state['dm']['fase5'] = {
                         'ev_promedio': ev_promedio,
                         'sharpe_promedio': sharpe_promedio,
@@ -1192,9 +1161,6 @@ if menu == "🏠 App Principal":
                         'sharpe_min': sharpe_min
                     }
                 
-                # ============================================
-                # FINALIZACIÓN
-                # ============================================
                 st.session_state['analisis_ejecutado'] = True
                 st.success("✅ ANÁLISIS COMPLETO EJECUTADO")
                 
@@ -1204,17 +1170,15 @@ if menu == "🏠 App Principal":
             st.code(traceback.format_exc())
             st.info("Por favor, verifica que todos los datos de entrada sean correctos.")
         
-        # ÚNICO st.rerun() AL FINAL DE LA EJECUCIÓN
         st.rerun()
     
     # ============================================
-    # RENDERIZADO PERSISTENTE (EL SALÓN)
+    # RENDERIZADO PERSISTENTE (EL SALÓN) - SIN CAMBIOS
     # ============================================
     
     if st.session_state.get('analisis_ejecutado', False) and 'dm' in st.session_state:
         dm = st.session_state['dm']
         
-        # ============ VALIDACIÓN DE MERCADO ============
         if 'inputs' in dm:
             inputs = dm['inputs']
             st.subheader("🎯 VALIDACIÓN DE MERCADO")
@@ -1241,7 +1205,6 @@ if menu == "🏠 App Principal":
                 st.metric("Liquidez", "✅" if val_volumen else "⚠️",
                         delta=f"{inputs.get('volumen_estimado', 1):.1f}x")
             
-            # Verificar condiciones
             condiciones_evasion = []
             if not val_min_odd: condiciones_evasion.append("Cuota < 1.60")
             if not val_or: condiciones_evasion.append(f"Overround alto ({inputs['overround']:.2%})")
@@ -1253,22 +1216,20 @@ if menu == "🏠 App Principal":
             
             st.success("✅ MERCADO VÁLIDO PARA ANÁLISIS")
         
-        # ============ FASE 1: INFERENCIA BAYESIANA ============
         if 'fase1' in dm:
             f1 = dm['fase1']
             inputs = dm['inputs']
             
             st.subheader("🧠 FASE 1: INFERENCIA BAYESIANA (CORREGIDA)")
             
-            # Nota sobre la corrección
-            st.info("**CORRECCIÓN APLICADA:** `lambda * delta_h * motivacion_h / carga_fisica_h` (delta_h es multiplicador)")
+            st.info("**CORRECCIÓN APLICADA:** `lambda_final = lambda_base × delta × motivación / carga_física` (delta=1.0 es neutro)")
             
             col_inf1, col_inf2 = st.columns(2)
             
             with col_inf1:
                 st.markdown(f"**🏠 {inputs['team_h']}**")
                 st.metric("λ Posterior", f"{f1['l_h_adj']:.3f}", 
-                         help="Goles esperados ajustados con factores de forma")
+                         help="Goles esperados ajustados con factores multiplicativos")
                 st.metric("Incertidumbre", f"{f1['inc_h']:.3%}")
                 st.caption(f"Intervalo Credibilidad: {f1['ci_h'][0]:.2f} - {f1['ci_h'][1]:.2f}")
                 st.caption(f"Factor Forma: ×{st.session_state['delta_h']:.2f}")
@@ -1276,18 +1237,16 @@ if menu == "🏠 App Principal":
             with col_inf2:
                 st.markdown(f"**✈️ {inputs['team_a']}**")
                 st.metric("λ Posterior", f"{f1['l_a_adj']:.3f}", 
-                         help="Goles esperados ajustados con factores de forma")
+                         help="Goles esperados ajustados con factores multiplicativos")
                 st.metric("Incertidumbre", f"{f1['inc_a']:.3%}")
                 st.caption(f"Intervalo Credibilidad: {f1['ci_a'][0]:.2f} - {f1['ci_a'][1]:.2f}")
                 st.caption(f"Factor Forma: ×{st.session_state['delta_a']:.2f}")
         
-        # ============ FASE 2: SIMULACIÓN MONTE CARLO ============
         if 'fase2' in dm:
             f2 = dm['fase2']
             
             st.subheader("🎲 FASE 2: SIMULACIÓN MONTE CARLO (50,000 escenarios)")
             
-            # Gráfico de barras
             fig_sim = go.Figure(data=[
                 go.Bar(
                     x=["1 (Local)", "X (Empate)", "2 (Visitante)"],
@@ -1306,13 +1265,11 @@ if menu == "🏠 App Principal":
             )
             st.plotly_chart(fig_sim, use_container_width=True)
         
-        # ============ FASE 3: DETECCIÓN DE INEFICIENCIAS ============
         if 'fase3' in dm:
             f3 = dm['fase3']
             
             st.subheader("🔍 FASE 3: DETECCIÓN DE INEFICIENCIAS")
             
-            # Tabla de resultados
             df_resultados = pd.DataFrame([
                 {
                     "Resultado": r["Resultado"],
@@ -1330,14 +1287,12 @@ if menu == "🏠 App Principal":
             ])
             st.dataframe(df_resultados, use_container_width=True)
             
-            # Picks con valor
             picks_con_valor = f3['picks_con_valor']
             if picks_con_valor:
                 st.success(f"✅ **{len(picks_con_valor)} INEFICIENCIA(S) DETECTADA(S)**")
             else:
                 st.warning("⚠️ MERCADO EFICIENTE: No se detectan ineficiencias significativas")
         
-        # ============ FASE 4: GESTIÓN DE CAPITAL ============
         if 'fase4' in dm:
             f4 = dm['fase4']
             
@@ -1349,20 +1304,17 @@ if menu == "🏠 App Principal":
             if not recomendaciones:
                 st.info("📭 No hay picks con valor para gestionar capital")
             else:
-                # Mostrar stake total
                 stake_total = sum([r.get('stake_abs', 0) for r in recomendaciones])
                 st.info(f"📊 **Stake Total Recomendado:** €{stake_total:,.2f} ({stake_total/bankroll*100:.1f}% del bankroll)")
                 
                 if stake_total > bankroll * 0.25:
                     st.warning("⚠️ **ALERTA:** Estás apostando más del 25% de tu bankroll. Considera reducir stakes.")
                 
-                # Mostrar cada recomendación - SIEMPRE VISIBLE (sin condiciones)
                 for i, rec in enumerate(recomendaciones):
                     with st.expander(
                         f"🎯 **RECOMENDACIÓN {i+1}: {rec['resultado']}** - EV: {rec['ev']} - Stake: {rec['kelly_pct']:.2f}%",
                         expanded=True
                     ):
-                        # Fila 1: Métricas
                         col_met1, col_met2, col_met3, col_met4 = st.columns(4)
                         
                         with col_met1:
@@ -1381,7 +1333,6 @@ if menu == "🏠 App Principal":
                             st.metric("📈 Sharpe", f"{rec['sharpe_esperado']:.2f}")
                             st.caption("Ratio riesgo/retorno")
                         
-                        # Fila 2: BOTONES DE ACCIÓN - EN 3 COLUMNAS SEPARADAS
                         st.markdown("---")
                         st.subheader("📝 REGISTRAR RESULTADO")
                         
@@ -1391,7 +1342,7 @@ if menu == "🏠 App Principal":
                             if st.button(f"✅ GANADA", key=f"win_{i}_{uuid.uuid4()}", 
                                       type="primary", use_container_width=True):
                                 ganancia = rec.get('stake_abs', 0) * (rec.get('cuota_numerico', 2.0) - 1)
-                                resultado = actualizar_bankroll(
+                                actualizar_bankroll(
                                     resultado_apuesta="ganada",
                                     monto_apostado=rec.get('stake_abs', 0),
                                     cuota=rec.get('cuota_numerico', 2.0),
@@ -1404,7 +1355,7 @@ if menu == "🏠 App Principal":
                         with col_btn2:
                             if st.button(f"❌ PERDIDA", key=f"loss_{i}_{uuid.uuid4()}", 
                                       type="secondary", use_container_width=True):
-                                resultado = actualizar_bankroll(
+                                actualizar_bankroll(
                                     resultado_apuesta="perdida",
                                     monto_apostado=rec.get('stake_abs', 0),
                                     pick=rec['resultado'],
@@ -1416,7 +1367,7 @@ if menu == "🏠 App Principal":
                         with col_btn3:
                             if st.button(f"🔄 VOID", key=f"void_{i}_{uuid.uuid4()}", 
                                       type="secondary", use_container_width=True):
-                                resultado = actualizar_bankroll(
+                                actualizar_bankroll(
                                     resultado_apuesta="void",
                                     monto_apostado=rec.get('stake_abs', 0),
                                     pick=rec['resultado'],
@@ -1424,18 +1375,7 @@ if menu == "🏠 App Principal":
                                 )
                                 st.info("💰 Apuesta anulada - Stake devuelto")
                                 st.rerun()
-                        
-                        # Información adicional
-                        with st.expander("📊 Métricas detalladas", expanded=False):
-                            col_det1, col_det2 = st.columns(2)
-                            with col_det1:
-                                st.metric("🎯 Prob. Profit", f"{rec['prob_profit']:.1%}")
-                                st.metric("📉 Max DD Esperado", f"{rec['max_dd_promedio']:.1%}")
-                            with col_det2:
-                                st.metric("📊 Kelly Base", f"{rec.get('kelly_base', 0):.2f}%" if 'kelly_base' in rec else "N/A")
-                                st.caption(f"**Razón:** {rec.get('razon_kelly', 'Sin información')}")
         
-        # ============ FASE 5: MÉTRICAS DE PERFORMANCE ============
         if 'fase5' in dm:
             f5 = dm['fase5']
             
@@ -1462,7 +1402,6 @@ if menu == "🏠 App Principal":
                 st.metric("Prob. Éxito", f"{f5['prob_profit_promedio']:.1%}")
                 st.caption("Probabilidad de ganar")
             
-            # Resumen de objetivos
             objetivos_cumplidos = f5['objetivos_cumplidos']
             if len(objetivos_cumplidos) >= 2:
                 st.success(f"✅ **SISTEMA DENTRO DE PARÁMETROS:** {', '.join(objetivos_cumplidos)}")
@@ -1476,7 +1415,6 @@ if menu == "🏠 App Principal":
     st.markdown("---")
     st.subheader("🎰 REGISTRO MANUAL DE APUESTAS")
     
-    # Mostrar métricas del bankroll (SIEMPRE VISIBLE)
     col_br1, col_br2, col_br3 = st.columns(3)
     
     with col_br1:
@@ -1532,7 +1470,6 @@ elif menu == "📊 Historial":
     if st.session_state.get('historial_apuestas'):
         df_historial = pd.DataFrame(st.session_state.historial_apuestas)
         
-        # Mostrar estadísticas
         col1, col2, col_beneficio = st.columns(3)
         
         with col1:
@@ -1547,14 +1484,11 @@ elif menu == "📊 Historial":
             tasa_acierto = (apuestas_ganadas / total_apuestas * 100) if total_apuestas > 0 else 0
             st.metric("Tasa de Acierto", f"{tasa_acierto:.1f}%")
         
-        # Mostrar beneficio neto en el historial también
         st.metric("💰 Beneficio Neto Acumulado", f"€{st.session_state.get('beneficio_neto', 0):,.2f}")
         
-        # Mostrar tabla de historial
         st.subheader("📋 Historial Detallado")
         st.dataframe(df_historial, use_container_width=True)
         
-        # Opción para exportar historial
         if st.button("📥 Exportar Historial a CSV"):
             csv = df_historial.to_csv(index=False)
             st.download_button(
